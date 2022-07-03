@@ -56,7 +56,7 @@ async def whose_house_universal(h : House):
     # perhaps modify house and return it
     return h
     
-async do_thing():
+async def do_thing():
     # get whose_house by model
     house = await my_model.get_state("whose_house", universal)
 ```
