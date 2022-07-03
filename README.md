@@ -20,7 +20,7 @@ my_model = Model()
 async def hello_world():
     return "Hello, world!"
 
-@my_model.get("whose_world")
+@my_model.get("whose_house")
 async def whose_world_global():
     return "Our world."
 
