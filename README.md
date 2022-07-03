@@ -61,7 +61,7 @@ async def do_thing():
     house = await my_model.get_state("whose_house", universal)
 ```
 
-State getters will receive a value that is serialized based on a type object in the decorator.
+State setters will receive a value that is serialized based on a type object in the decorator.
 ```python
 @my_model.set("whose_house", session, t=House)
 async def set_whose_world_user(val):
