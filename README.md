@@ -21,7 +21,7 @@ async def hello_world():
     return "Hello, world!"
 
 @my_model.get("whose_house")
-async def whose_world_global():
+async def whose_house_universal():
     return "Our world."
 
 @my_model.get("whose_house", session)
