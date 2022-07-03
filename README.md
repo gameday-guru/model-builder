@@ -53,12 +53,11 @@ State getters will receive a value that is serialized based on a type object in 
 ```python
 @my_model.get("whose_house", t=House)
 async def whose_house_universal(h : House):
-    // perhaps modify house and return it
-    return House
+    # perhaps modify house and return it
+    return h
     
 async do_thing():
-
-    // get whose_house by model
+    # get whose_house by model
     house = await my_model.get_state("whose_house", universal)
 ```
 
