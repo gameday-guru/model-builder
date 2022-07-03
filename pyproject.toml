@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "model-builder"
+version = "0.1.0"
+description = ""
+authors = ["Liam Monninger <l.mak.monninger@gmail.com>"]
+license = "MIT"
+
+[tool.poetry.dependencies]
+python = ">3.9,<4.0"
+fastapi = {extras = ["all"], version = "^0.78.0"}
+attrs = "^21.4.0"
+numpy = "^1.23.0"
+redis = "^4.3.4"
+cattrs = "^22.1.0"
+
+[tool.poetry.dev-dependencies]
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
