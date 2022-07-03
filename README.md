@@ -61,6 +61,17 @@ async def do_thing():
     house = await my_model.get_state("whose_house", universal)
 ```
 
+State getters will receive a value that is serialized based on a type object in the decorator.
+```python
+@my_model.set("whose_house", session, t=House)
+async def set_whose_world_user(val):
+    return val
+    
+async def do_thing():
+    # get whose_house by model
+    house = await my_model.set_state("whose_house", House(), session)
+```
+
 
 ### State Bounds
 State can be bound to one of the `execution`, `session`, `user`, or `universal` contexts, meaning it will carry a unique value in this context if one is provided. 
