@@ -44,10 +44,24 @@ The model is a contextual object that exposes all RPC methods, listens for event
 Persistent state (state maintained in the distributed store) can be set and retrieved via decorating handler logic with the `Model.get` and `Model.set` me methods.
 
 ```python
-@my_model.method()
-async def hello_world():
-    return "Hello, world!"
+@my_model.get("whose_house")
+async def whose_house_universal():
+    return "Our world."
 ```
+
+State getters will receive a value that is serialized based on a type object in the decorator.
+```python
+@my_model.get("whose_house", t=House)
+async def whose_house_universal(h : House):
+    // perhaps modify house and return it
+    return House
+    
+async do_thing():
+
+    // get whose_house by model
+    house = await my_model.get_state("whose_house", universal)
+```
+
 
 ### State Bounds
 State can be bound to one of the `execution`, `session`, `user`, or `universal` contexts, meaning it will carry a unique value in this context if one is provided. 
