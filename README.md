@@ -116,20 +116,20 @@ async def update_task():
 ## Config file
 ```toml
 # which backend to run against, use local for now
-[compute] = "local"
+compute = "local"
 
 # keys that will be included in local running and build
 [keys]
-    # keys that will be wrapped up in the build
-    [build_keys.whatever]
+# keys that will be wrapped up in the build
+whatever = "XXXXX"
 
 # keys to be used when running locally
 [local_keys] 
-    # you will need to provide the sportsdataio key when 
-    [local_keys.sportsdataio] = "XXXXXXX"
+# ! you will need to provide the sportsdataio key when 
+sportsdataio = "XXXXXXX"
     
 # build keys
 [build_keys] 
-    # keys that will be wrapped up in the build
-    [build_keys.whatever]
+# keys that will be wrapped up in the build
+whatever = "XXXXXX"
 ```
