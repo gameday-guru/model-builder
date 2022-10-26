@@ -1,5 +1,8 @@
 from typing import Protocol
-from ..bounds.user.user import UserBoundedlike, UserBounded
+
+from attr import frozen
+
+from ..bounds.user.user import UserBounded, UserBoundedlike
 
 
 class Userlike(UserBoundedlike, Protocol):
@@ -10,6 +13,7 @@ class Userlike(UserBoundedlike, Protocol):
     # a sub id to indicate the connection the user is making
     connection_id : str
 
+@frozen
 class User(UserBounded, UserBoundedlike):
 
     # an id for the the exeuction

@@ -1,5 +1,8 @@
 from typing import Protocol
-from ..bounds.session.session import SessionBoundedlike, SessionBounded
+
+from attr import frozen
+
+from ..bounds.session.session import SessionBounded, SessionBoundedlike
 
 
 class Sessionlike(SessionBoundedlike, Protocol):
@@ -13,6 +16,7 @@ class Sessionlike(SessionBoundedlike, Protocol):
     # time stamp for when the session expires
     exp : int
 
+@frozen
 class Session(SessionBounded, SessionBoundedlike):
 
     # an id for the the exeuction
