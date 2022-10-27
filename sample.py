@@ -1,4 +1,4 @@
-from model_builder import Model, private, session, universal
+from model_builder import Model, private, session, spiodirect, universal
 
 # create a model
 my_model = Model()
