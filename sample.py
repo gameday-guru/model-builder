@@ -19,7 +19,12 @@ async def get_whose_world_user(context, val):
 async def set_whose_world_user(context, val):
     return val
 
-my_model.start()
+@my_model.task(cron_str='46 * * * *')
+async def say_hello():
+    print("Hello")
+
+if __name__ == "__main__":
+    my_model.start()
 
 """
 @my_model.task(136903)

@@ -15,7 +15,13 @@ class Event(Eventlike):
 
     @classmethod
     def get_hash(cls)->str:
-        hash.update(dumps(cls.__dict__.keys()))
-        hash.update(dumps(cls.__dict__.values()))
-        hash.update(cls.id)
-        return hash.digest().hex()
+        obj_hash = sha256()
+        obj_hash.update(dumps(list(cls.__dict__.keys())).encode('utf-8'))
+        obj_hash.update(cls.id.to_bytes(8, 'little'))
+        return obj_hash.digest().hex()
+
+    def get_event_instance_hash(self)->str:
+        obj_hash = sha256()
+        obj_hash.update(dumps(self.__dict__).encode('utf-8'))
+        obj_hash.update(self.id.to_bytes(8, 'little'))
+        return obj_hash.digest().hex()

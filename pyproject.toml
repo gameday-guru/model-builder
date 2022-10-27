@@ -12,6 +12,7 @@ attrs = "^21.4.0"
 numpy = "^1.23.0"
 redis = "^4.3.4"
 cattrs = "^22.1.0"
+pycron = "^3.0.0"
 
 [tool.poetry.dev-dependencies]
 

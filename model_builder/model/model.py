@@ -1,9 +1,11 @@
+import asyncio
 import concurrent.futures
 import json
+import math
 import time
-from tkinter import EventType
 import uuid
 from typing import Any, Awaitable, Callable, Dict, Protocol, Sequence, TypeVar
+import pycron
 
 import cattrs
 import redis
@@ -82,6 +84,9 @@ r = redis.Redis(host='localhost', port=6379, db=0)
 class PrivateMethodException(Exception):
     pass
 
+class UninitializedEventException(Exception):
+    pass
+
 class Model(Modellike):
 
     app : FastAPI
@@ -89,10 +94,12 @@ class Model(Modellike):
     store : redis.Redis
 
     event_hashes : Dict[str, tuple[type, EO]] = {}
+    
+    cron_events : Dict[str, Event] = {}
 
-    task_listener_pool = concurrent.futures.ProcessPoolExecutor()
-
-    app_op_pool = concurrent.futures.ProcessPoolExecutor()
+    cron_pool = concurrent.futures.ThreadPoolExecutor()
+    task_listener_pool = concurrent.futures.ThreadPoolExecutor()
+    server_pool = concurrent.futures.ThreadPoolExecutor()
     
     get_methods : Dict[Context, Dict[str, AC]] = {}
     
@@ -101,13 +108,16 @@ class Model(Modellike):
     reified_methods : Dict[str, AC] = {}
     
     consumer_id : str
+    
+    cron_window : int
 
 
-    def __init__(self, /, *, store : redis.Redis = r) -> None:
+    def __init__(self, /, *, store : redis.Redis = r, cron_window : int = 15) -> None:
         super().__init__()
         self.app = FastAPI()
         self.store = store
-        self.consumer_id = uuid.uuid1()
+        self.consumer_id = uuid.uuid1().hex
+        self.cron_window = cron_window
 
 
     def method(self)->Callable[[AC], AC]:
@@ -181,7 +191,7 @@ class Model(Modellike):
                     exp=time.time() * 1000 + 60000
                 ),
                 execution=Execution(
-                    id=uuid.uuid4()
+                    id=uuid.uuid1().hex
                 )
             ))
             
@@ -244,12 +254,38 @@ class Model(Modellike):
                     exp=time.time() * 1000 + 60000
                 ),
                 execution=Execution(
-                    id=uuid.uuid4()
+                    id=uuid.uuid4().hex
                 )
             ), data.data)
             return JSONResponse(res.json())
+        
+    def emit(self, e : Event):
+        """Emits an event safely checking the lock while doing so.
 
-    def task(self, e : type[Event])->Callable[[EO], EO]:
+        Args:
+            e (Event): the event.
+
+        Raises:
+            UninitializedEventException: _description_
+        """
+        
+        event_hash = e.__class__.get_hash()
+        event_instance_hash = e.get_event_instance_hash()
+        if e.__class__.get_hash() not in self.event_hashes:
+            raise UninitializedEventException()
+        
+        event_lock_addr = f"event:{event_hash}:{event_instance_hash}"
+        self.store.set(event_lock_addr, self.consumer_id)
+        
+        lock_check = self.store.get(event_lock_addr)
+        
+        if(lock_check != self.consumer_id):
+            # someone else hase the lock, someone else will dispatch
+            return
+        
+        self.store.xadd(event_hash, cattrs.unstructure(e, e.__class__))
+
+    def _task(self, e : type[Event] = None)->Callable[[EO], EO]:
         """Initializes a task for model.
 
         Args:
@@ -262,44 +298,111 @@ class Model(Modellike):
         event_hash = e.get_hash()
         self.event_hashes[event_hash] = [e, EO]
         def decorator(func : EO):
-            def inner(e : EventType):
-                self.store.xadd(hash, e)
-                pass
+            # def inner(e : EventType):
+                # self.store.xadd(event_hash, cattrs.unstructure(e,))
                 # nothing
             return func
         return decorator
     
-    async def listen_task(self, task_id : str):
+    def task(self, e : type[Event] = None, cron_str : str = None)->Callable[[EO], EO]:
         
-        self.store.xgroup_createconsumer(task_id, self.consumer_id, self.consumer_id)
+        if e is not None:
+            return self._task(e)
+        
+        if e is None and cron_str is None:
+            raise Exception()
+        
+        if e is None:
+            print(cron_str)
+            cstr = cron_str
+            class Cron(Event):
+                fifteens : str
+                cron_str : str = cstr
+                
+                def __init__(self, windows : int) -> None:
+                    super().__init__()
+                    self.windows = windows
+                
+            self.cron_events[Cron.cron_str] = Cron
+            return self._task(Cron)
+                    
+    def _run_cron(self, status : int):
+         while True:
+            time.sleep(self.cron_window) 
+            for cron_str in self.cron_events:
+                if pycron.is_now(cron_str):  
+                    window = math.floor(time.time()/self.cron_window)
+                    cron_event = self.cron_events[cron_str](window)
+                    self.emit(cron_event)   
+        
+    async def run_cron(self, loop : asyncio.BaseEventLoop):
+        return await loop.run_in_executor(self.cron_pool, self._run_cron, 1)
+
+    def _listen_task(self, event_hash : str):
+        """_summary_
+
+        Args:
+            event_hash (str): _description_
+        """
+        self.store.xadd(event_hash, {"data" : "a"})
+        self.store.xgroup_create(event_hash, self.consumer_id)
+        self.store.xgroup_createconsumer(event_hash, self.consumer_id, self.consumer_id)
         
         while True:
             # may want to do some error handling here
-            for resp in self.store.xautoclaim(task_id, self.consumer_id, self.consumer_id, min_idle_time=0, count=10):
-                key, messages = resp[0]
-                task_type, coroutine = self.task_hashes[key]
+            self.store.xautoclaim(event_hash, self.consumer_id, self.consumer_id, min_idle_time=0, count=10)
+            # claim the event for yourself
+            for resp in self.store.xreadgroup(self.consumer_id, self.consumer_id, {
+                event_hash : 0
+            }):
+                _, messages = resp
+                task_type, routine = self.event_hashes[event_hash]
                 for message in messages:
-                    coroutine(cattrs.structure(message, task_type))
+                    routine(cattrs.structure(message, task_type))
+    
+    async def listen_task(self, event_hash : str, loop : asyncio.BaseEventLoop):
+        """Listens to a task.
+
+        Args:
+            event_hash (str): _description_
+        """
+        
+        return await loop.run_in_executor(self.task_listener_pool, self._listen_task, event_hash)
           
     
-    def listen_task(self, ):
+    async def listen_tasks(self, loop : asyncio.BaseEventLoop):
+        """Listens for tasks
+        """
 
-        for id in self.event_hashes:
+        return [
+            await self.listen_task(id, loop)
+            for id in self.event_hashes
+        ]
+    
+    def _run_server(self, status : int):
+        """_summary_
+        """
+        uvicorn.run(self.app)
+     
             
+    async def run_server(self, loop : asyncio.BaseEventLoop):
+        """_summary_
+        """
+        return await loop.run_in_executor(self.server_pool, self._run_server, 1)
+    
+    async def _start(self, loop : asyncio.BaseEventLoop = asyncio.get_event_loop()):
+        return await asyncio.gather(
+            self.listen_tasks(loop),
+            self.run_cron(loop),
+            self.run_server(loop)
+        )
 
 
-    def start(self):
-
-        def run_app():
-            uvicorn.run(self.app)
-            
-        run_app()
-
-       
-
-        # self.task_listener_pool.submit(listen_tasks)
-
-        # self.app_op_pool.submit(run_app)
+    def start(self, loop : asyncio.BaseEventLoop = asyncio.get_event_loop()):
+        
+        print(self.cron_events)
+        
+        loop.run_until_complete(self._start(loop))
 
         
 
