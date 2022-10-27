@@ -44,7 +44,7 @@ The model is a contextual object that exposes all RPC methods, listens for event
 Persistent state (state maintained in the distributed store) can be set and retrieved via decorating handler logic with the `Model.get` and `Model.set` me methods.
 
 ```python
-@my_model.get("whose_house")
+@my_model.get("whose_house", t=House)
 async def whose_house_universal():
     return "Our world."
 ```
