@@ -8,7 +8,7 @@ pip install gdg-model-builder
 
 ## Sample Model
 ```python
-from gdg_model_builder import session, Session, Model, Event
+from gdg_model_builder import session, universal, Model, Event
 
 class MyEvent(Event):
     id = 2
@@ -17,15 +17,15 @@ class MyEvent(Event):
 my_model = Model()
 
 @my_model.method()
-async def hello_world():
+async def hello_world(t=str):
     return "Hello, world!"
 
-@my_model.get("whose_house")
+@my_model.get("whose_house", universal)
 async def whose_house_universal():
     return "Our world."
 
 @my_model.get("whose_house", session)
-async def get_whose_world_user():
+async def get_whose_world_session():
     return "your house."
 
 @my_model.set("whose_house", session)
