@@ -1,9 +1,11 @@
-from typing import Optional, Protocol
+from typing import Optional, Protocol, Sequence
 
 from pydantic import BaseModel
+import requests
+from dotenv import dotenv_values
 
 
-class Stadiumlike(Protocol):
+class Stadiumlike(BaseModel):
     stadium_id: int
     active: bool
     name: str
@@ -17,7 +19,7 @@ class Stadiumlike(Protocol):
     geo_long: float
 
 
-class Teamlike(Protocol):
+class Teamlike(BaseModel):
     team_id: int
     key: str
     active: bool
@@ -36,7 +38,7 @@ class Teamlike(Protocol):
     stadium: Stadiumlike
 
 
-class Stadium(Stadiumlike, BaseModel):
+class Stadium(BaseModel):
     stadium_id: int
     active: bool
     name: str
@@ -50,7 +52,7 @@ class Stadium(Stadiumlike, BaseModel):
     geo_long: float
 
 
-class Team(Teamlike, BaseModel):
+class Team(BaseModel):
     team_id: int
     key: str
     active: bool

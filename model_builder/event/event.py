@@ -6,7 +6,7 @@ class Eventlike(Protocol):
 
     id : int
 
-    async def get_hash(self)->str:
+    def get_hash(self)->str:
         pass
 
 class Event(Eventlike):
@@ -14,8 +14,8 @@ class Event(Eventlike):
     id : int = 1
 
     @classmethod
-    async def get_hash(cls)->str:
-        hash = sha256()
+    def get_hash(cls)->str:
         hash.update(dumps(cls.__dict__.keys()))
+        hash.update(dumps(cls.__dict__.values()))
         hash.update(cls.id)
         return hash.digest().hex()

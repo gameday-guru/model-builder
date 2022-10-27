@@ -6,7 +6,7 @@ from dotenv import dotenv_values
 from pydantic import BaseModel
 
 
-class Periodlike(Protocol):
+class Periodlike(BaseModel):
     period_id: int
     game_id: int
     number: int
@@ -15,7 +15,7 @@ class Periodlike(Protocol):
     away_score: int
     home_score: int
 
-class GamesByDatelike(Protocol):
+class GamesByDatelike(BaseModel):
     game_id: int
     season: int
     season_type: int
@@ -66,7 +66,7 @@ class GamesByDatelike(Protocol):
     stadium: None
     periods: List[Periodlike]
     
-class Period(Periodlike, BaseModel):
+class Period(BaseModel):
     period_id: int
     game_id: int
     number: int
@@ -75,7 +75,7 @@ class Period(Periodlike, BaseModel):
     away_score: int
     home_score: int
 
-class GameByDate(GamesByDatelike, BaseModel):
+class GameByDate(BaseModel):
     game_id: int
     season: int
     season_type: int

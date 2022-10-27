@@ -1,6 +1,7 @@
 import concurrent.futures
 import json
 import time
+from tkinter import EventType
 import uuid
 from typing import Any, Awaitable, Callable, Dict, Protocol, Sequence, TypeVar
 
@@ -87,7 +88,7 @@ class Model(Modellike):
     
     store : redis.Redis
 
-    task_hashes : Dict[str, tuple[type, EO]] = {}
+    event_hashes : Dict[str, tuple[type, EO]] = {}
 
     task_listener_pool = concurrent.futures.ProcessPoolExecutor()
 
@@ -98,12 +99,15 @@ class Model(Modellike):
     set_methods : Dict[Context, Dict[str, AC]] = {}
     
     reified_methods : Dict[str, AC] = {}
+    
+    consumer_id : str
 
 
     def __init__(self, /, *, store : redis.Redis = r) -> None:
         super().__init__()
         self.app = FastAPI()
         self.store = store
+        self.consumer_id = uuid.uuid1()
 
 
     def method(self)->Callable[[AC], AC]:
@@ -255,11 +259,34 @@ class Model(Modellike):
         Returns:
             EO: _description_
         """
-        hash = e.get_hash()
-        self.task_hashes[hash] = [e, EO]
+        event_hash = e.get_hash()
+        self.event_hashes[event_hash] = [e, EO]
         def decorator(func : EO):
+            def inner(e : EventType):
+                self.store.xadd(hash, e)
+                pass
+                # nothing
             return func
         return decorator
+    
+    async def listen_task(self, task_id : str):
+        
+        self.store.xgroup_createconsumer(task_id, self.consumer_id, self.consumer_id)
+        
+        while True:
+            # may want to do some error handling here
+            for resp in self.store.xautoclaim(task_id, self.consumer_id, self.consumer_id, min_idle_time=0, count=10):
+                key, messages = resp[0]
+                task_type, coroutine = self.task_hashes[key]
+                for message in messages:
+                    coroutine(cattrs.structure(message, task_type))
+          
+    
+    def listen_task(self, ):
+
+        for id in self.event_hashes:
+            
+
 
     def start(self):
 
@@ -268,23 +295,7 @@ class Model(Modellike):
             
         run_app()
 
-        def listen_tasks():
-
-            md = {}
-            for id in self.task_hashes:
-                md[id] = 0
-            
-
-            # need to switch to claiming/auto
-            while True:
-                try:
-                    for resp in self.store.xread(md, count=1, block=50):
-                        key, messages = resp[0]
-                        task_type, coroutine = self.task_hashes[key]
-                        for message in messages:
-                            coroutine(cattrs.structure(message, task_type))
-                except ConnectionError as connection_error:
-                    print(f"ERROR REDIS CONNECTION: {connection_error}")
+       
 
         # self.task_listener_pool.submit(listen_tasks)
 
