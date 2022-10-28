@@ -1,4 +1,11 @@
-from gdg_model_builder import Model, private, session, spiodirect, universal, poll, secs, dow
+from gdg_model_builder import Model, private, session, spiodirect, universal, poll, secs, dow, Event
+
+class FriendlyEvent(Event):
+    note : str = "love"
+    nonce : bool = False
+    
+    def __init__(self, **kwargs) -> None:
+        super().__init__(**kwargs)
 
 # create a model
 my_model = Model(cron_window=1)
@@ -27,6 +34,28 @@ async def say_hello(event = None):
         event (_type_, optional): _description_. Defaults to None.
     """
     print("Hello")
+
+
+@my_model.task(valid=secs(5))
+async def huzzah_hello(event = None):
+    """Says huzzah
+
+    Args:
+        event (_type_, optional): _description_. Defaults to None.
+    """
+    my_model.emit(FriendlyEvent(note="Hey!"))
+    print("huzzah")
+    # my_model.emit(FriendlyEvent())
+    # print("huzzah")
+    
+@my_model.task(e=FriendlyEvent)
+async def huzzah_hello(event = None):
+    """Says huzzah
+
+    Args:
+        event (_type_, optional): _description_. Defaults to None.
+    """
+    print("Goodday!")
 
 if __name__ == "__main__":
     my_model.start()

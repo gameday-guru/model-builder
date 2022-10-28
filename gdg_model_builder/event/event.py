@@ -22,6 +22,7 @@ class Eventlike(Protocol):
         obj_hash = sha256()
         obj_hash.update(cls.__name__.encode('utf-8'))
         obj_hash.update(dumps(list(cls.__dict__.keys())).encode('utf-8'))
+        obj_hash.update(str(cls.id).encode('utf-8'))
         res = obj_hash.digest().hex()
         print(res)
         return res
