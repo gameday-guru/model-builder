@@ -26,7 +26,7 @@ async def get_whose_world_user(context, val):
 async def set_whose_world_user(context, val):
     return val
 
-@my_model.task(valid=dow(4))
+@my_model.task(valid=dow(5))
 async def say_hello(event = None):
     """Says hello
 

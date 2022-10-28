@@ -1,13 +1,14 @@
-from typing import Protocol
+from typing import Protocol, Optional
 from hashlib import sha256
 from json import dumps
 from typing_extensions import Self
-from attrs import frozen, asdict
 
 class Eventlike(Protocol):
 
     id : int = 0
     nonce : bool = True
+    model_hostname : Optional[str] = None
+    exclusive : bool = True
     
     def __init__(self, **kwargs) -> None:
         super().__init__()
@@ -38,6 +39,8 @@ class Event(Eventlike):
     
     id : int = 1
     nonce : bool = True
+    model_hostname : Optional[str] = None
+    exclusive : bool = True
     
     def __init__(self, **kwargs) -> None:
         super().__init__()

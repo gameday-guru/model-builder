@@ -59,6 +59,7 @@ def hours(count : int)->LA:
         if last is None or (now - last)/(1000 * 60 * 60) > count:
             return int(time.time()/(1000 * 60 * 60))
         return -1
+    _hours.__name__ = f"_hours_{count}"
     return _hours
 
 def days(count : int)->LA:
@@ -66,6 +67,7 @@ def days(count : int)->LA:
         if last is None or (now - last)/(1000 * 60 * 60 * 24) > count:
             return int(time.time()/(1000 * 60 * 60 * 24))
         return -1
+    _days.__name__ = f"_days_{count}"
     return _days
 
 def months(count : int)->LA:
@@ -75,6 +77,7 @@ def months(count : int)->LA:
         if last is None or (dt_now.month - dt_last.month) > count:
             return dt_now.month
         return -1
+    _months.__name__ = f"_months_{count}"
     return _months
 
 def dow(which : int)->LA:
@@ -85,6 +88,7 @@ def dow(which : int)->LA:
         if dt_now.toordinal() % 7 == which and (last is None or now_epoch_days != last_epoch_days):
             return now_epoch_days
         return -1
+    _dow.__name__ = f"_months_{which}"
     return _dow
 
 def date_once(*, which : str, format : str)->LA:
@@ -95,6 +99,7 @@ def date_once(*, which : str, format : str)->LA:
         if last is None and date_str == now_str:
             return now_epoch_days
         return -1
+    _date_once.__name__ = f"_months_{which}_{format}"
     return _date_once
     
 nonce = 'gamedaygurunoncenonotuseforanythingbutwhatisrecommendedherein'
@@ -126,10 +131,7 @@ class Modellike(Protocol):
         """
         pass
 
-    def emits(self, func : AC)->AC:
-        pass
-
-    async def emit(self, e : Event)->None:
+    def emit(self, e : Event)->None:
         """_summary_
         """
         pass
@@ -154,6 +156,8 @@ class UninitializedEventException(Exception):
     pass
 
 class Model(Modellike):
+    
+    model_hostname : str = "0"
 
     app : FastAPI
     
@@ -262,7 +266,9 @@ class Model(Modellike):
             ))
             
             return JSONResponse(t(data=res).json())
-            
+           
+    def get_inner_key(self, key : str):
+        return f"{self.model_hostname}:{key}" 
 
     def set(self, key : str, *args, t : type[R])->Callable[[CO], CO]:
         """Binds a set method to the model.
@@ -282,8 +288,8 @@ class Model(Modellike):
         def decorator(func : CO):
             async def inner(context : Context, value : R):
                 val : R = await func(context, value)
-                self.store.lpush(get_min_key(bounds=args, key=key, context=context), Model(data=val).json())
-                return Model.parse_raw(self.store.lrange(get_min_key(bounds=args, key=key, context=context), 0, 0)[0])
+                self.store.lpush(get_min_key(bounds=args, key=self.get_inner_key(key), context=context), Model(data=val).json())
+                return Model.parse_raw(self.store.lrange(get_min_key(bounds=args, key=self.get_inner_key(key), context=context), 0, 0)[0])
             
             # register inner with get_methods map
             for arg in args:
@@ -325,6 +331,35 @@ class Model(Modellike):
             ), data.data)
             return JSONResponse(res.json())
         
+    def get_relative_event_hash(self, e : Event)->str:
+        """Gets the event hash relative to this model.
+
+        Args:
+            e (Event): _description_
+
+        Returns:
+            str: _description_
+        """
+        if e.model_hostname is not None:
+            return f"{e.model_hostname}:${e.get_event_hash()}"
+        return f"{self.model_hostname}:${e.get_event_hash()}"
+    
+    def get_relative_event_instance_hash(self, e : Event)->str:
+        """Gets the event instance hash relative to this model.
+
+        Args:
+            e (Event): _description_
+
+        Returns:
+            str: _description_
+        """
+        if e.model_hostname is not None:
+            return f"{e.model_hostname}:${e.get_event_instance_hash()}"
+        return f"{self.model_hostname}:${e.get_event_instance_hash()}"
+    
+    def get_event_lock_addr(self, e : Event)->str:
+        return f"event:{self.get_relative_event_hash(e)}:{self.get_relative_event_instance_hash(e)}"
+        
     def emit(self, e : Event):
         """Emits an event safely checking the lock while doing so.
 
@@ -334,17 +369,21 @@ class Model(Modellike):
         Raises:
             UninitializedEventException: _description_
         """
-        event_hash = e.get_event_hash()
-        event_instance_hash = e.get_event_instance_hash()
-        if event_hash not in self.event_handlers:
+        event_hash = self.get_relative_event_hash(e)
+        print("Attempting to emit: ", event_hash)
+        if event_hash not in self.event_handlers and (
+            e.model_hostname is None
+            or e.model_hostname == self.model_hostname
+        ):
             raise UninitializedEventException()
     
-        event_lock_addr = f"event:{event_hash}:{event_instance_hash}"
+        event_lock_addr = self.get_event_lock_addr(e)
         
         if e.nonce and self.store.exists(event_lock_addr):
             # someone has already posted this event
+            print("Someone has posted the lock...", event_lock_addr)
             return
-        
+    
         self.store.set(event_lock_addr, self.consumer_id)
         
         lock_check = self.store.get(event_lock_addr).decode('utf-8')
@@ -352,6 +391,8 @@ class Model(Modellike):
         if(lock_check != self.consumer_id):
             # someone else hase the lock, someone else will dispatch
             return
+
+        print("Emitting: ", event_hash)
 
         d = e.__dict__.copy()
         self.store.xadd(event_hash, d)
@@ -366,7 +407,11 @@ class Model(Modellike):
         Returns:
             EO: _description_
         """
-        event_hash = e.get_event_hash()
+        if e.model_hostname is None:
+            # tie it to this model if it isn't already associated somewhere
+            e.model_hostname = self.model_hostname
+        
+        event_hash = self.get_relative_event_hash(e)
         if event_hash not in self.event_handlers:
             self.event_handlers[event_hash] = []
         
@@ -389,6 +434,10 @@ class Model(Modellike):
         if e is None:
             vfunc = valid
             class Cron(CronEvent):
+                
+                # include in model
+                model_hostname: Optional[str] = self.model_hostname
+                
                 windows : str
                 valid: LA = vfunc
                 id : str = vfunc.__name__
@@ -399,7 +448,7 @@ class Model(Modellike):
                     
             Cron.__name__ = vfunc.__name__
             # add the cron class
-            self.cron_events[Cron.get_event_hash()] = Cron
+            self.cron_events[self.get_relative_event_hash(Cron)] = Cron
             
             return self._task(Cron)
                     
@@ -426,7 +475,7 @@ class Model(Modellike):
     def read_task_stream(self, event_hash : str):
     
             
-        for resp in self.store.xreadgroup(self.consumer_id, self.consumer_id, {
+        for resp in self.store.xreadgroup(self.model_hostname, self.consumer_id, {
             event_hash : '>'
         }, count=10, block=100):
             _, messages = resp
@@ -448,8 +497,10 @@ class Model(Modellike):
             event_hash (str): _description_
         """
         self.store.xadd(event_hash, {nonce : nonce})
-        self.store.xgroup_create(event_hash, self.consumer_id)
-        self.store.xgroup_createconsumer(event_hash, self.consumer_id, self.consumer_id)
+        self.store.xgroup_create(event_hash, self.model_hostname)
+        self.store.xgroup_createconsumer(event_hash, self.model_hostname, self.consumer_id)
+        
+        print(event_hash)
         
         while True:
             time.sleep(0)
