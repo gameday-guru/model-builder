@@ -26,7 +26,6 @@ def fminb(l : Sequence[Any])->Bound:
 
     minimum = universal
     for obj in l:
-        print(obj)
         if isinstance(obj, Bound):
             if obj.value < minimum.value:
                 minimum = obj

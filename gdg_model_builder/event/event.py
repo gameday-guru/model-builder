@@ -1,14 +1,27 @@
+from enum import Enum
 from typing import Protocol, Optional
 from hashlib import sha256
 from json import dumps
 from typing_extensions import Self
+
+class Particul(Enum):
+    shared = 0
+    exclusive = 1
+    iproxy = 2
+    pproxy = 3
+    
+shared = Particul.shared
+exclusive = Particul.exclusive
+iproxy = Particul.iproxy
+pproxy = Particul.pproxy
+
 
 class Eventlike(Protocol):
 
     id : int = 0
     nonce : bool = True
     model_hostname : Optional[str] = None
-    exclusive : bool = True
+    particul : Particul = Particul.exclusive
     
     def __init__(self, **kwargs) -> None:
         super().__init__()
@@ -24,8 +37,8 @@ class Eventlike(Protocol):
         obj_hash.update(cls.__name__.encode('utf-8'))
         obj_hash.update(dumps(list(cls.__dict__.keys())).encode('utf-8'))
         obj_hash.update(str(cls.id).encode('utf-8'))
+        obj_hash.update(str(cls.particul).encode('utf-8'))
         res = obj_hash.digest().hex()
-        print(res)
         return res
 
     def get_event_instance_hash(self)->str:
@@ -33,6 +46,7 @@ class Eventlike(Protocol):
         obj_hash = sha256()
         obj_hash.update(cls.__name__.encode('utf-8'))
         obj_hash.update(dumps(self.__dict__).encode('utf-8'))
+        obj_hash.update(str(cls.particul).encode('utf-8'))
         return obj_hash.digest().hex()
 
 class Event(Eventlike):
@@ -40,7 +54,7 @@ class Event(Eventlike):
     id : int = 1
     nonce : bool = True
     model_hostname : Optional[str] = None
-    exclusive : bool = True
+    particul : Particul = Particul.exclusive
     
     def __init__(self, **kwargs) -> None:
         super().__init__()
@@ -55,6 +69,8 @@ class Event(Eventlike):
         obj_hash = sha256()
         obj_hash.update(cls.__name__.encode('utf-8'))
         obj_hash.update(dumps(list(cls.__dict__.keys())).encode('utf-8'))
+        obj_hash.update(str(cls.id).encode('utf-8'))
+        obj_hash.update(str(cls.particul).encode('utf-8'))
         res = obj_hash.digest().hex()
         return res
 
@@ -63,4 +79,5 @@ class Event(Eventlike):
         obj_hash = sha256()
         obj_hash.update(cls.__name__.encode('utf-8'))
         obj_hash.update(dumps(self.__dict__).encode('utf-8'))
+        obj_hash.update(str(cls.particul).encode('utf-8'))
         return obj_hash.digest().hex()

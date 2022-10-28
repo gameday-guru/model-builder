@@ -21,7 +21,7 @@ from gdg_model_builder.context.context.context import Context, get_min_key
 from gdg_model_builder.context.execution.execution import Execution
 from gdg_model_builder.context.session.session import Session
 from gdg_model_builder.context.user.user import User, Userlike
-from gdg_model_builder.event.event import Event
+from gdg_model_builder.event.event import Event, exclusive, iproxy, pproxy
 from gdg_model_builder.modifiers.state import private
 
 P = TypeVar("P")
@@ -153,6 +153,9 @@ class PrivateMethodException(Exception):
     pass
 
 class UninitializedEventException(Exception):
+    pass
+
+class ExclusiveEmitError(Exception):
     pass
 
 class Model(Modellike):
@@ -369,19 +372,25 @@ class Model(Modellike):
         Raises:
             UninitializedEventException: _description_
         """
+        # intercept the emit based on exclusivity
+        if e.particul == exclusive and e.model_hostname != self.model_hostname:
+            raise ExclusiveEmitError(f"The event {e.__name__} is exclusive to {e.model_hostname}. You cannot emit it.")
+        elif e.particul == iproxy and e.model_hostname != self.model_hostname:
+            return
+        elif e.particul == pproxy and e.model_hostname != self.model_hostname:
+            return 
+        
         event_hash = self.get_relative_event_hash(e)
-        print("Attempting to emit: ", event_hash)
         if event_hash not in self.event_handlers and (
             e.model_hostname is None
             or e.model_hostname == self.model_hostname
         ):
             raise UninitializedEventException()
+
     
         event_lock_addr = self.get_event_lock_addr(e)
         
         if e.nonce and self.store.exists(event_lock_addr):
-            # someone has already posted this event
-            print("Someone has posted the lock...", event_lock_addr)
             return
     
         self.store.set(event_lock_addr, self.consumer_id)
@@ -391,8 +400,6 @@ class Model(Modellike):
         if(lock_check != self.consumer_id):
             # someone else hase the lock, someone else will dispatch
             return
-
-        print("Emitting: ", event_hash)
 
         d = e.__dict__.copy()
         self.store.xadd(event_hash, d)
@@ -481,7 +488,7 @@ class Model(Modellike):
             _, messages = resp
             
             for id, message in messages:
-                if nonce in message.keys():
+                if nonce in [key.decode('utf-8') for key in message.keys()]:
                     # we want to ignore nonces
                     continue
                 for EventType, routine in self.event_handlers[event_hash]:
@@ -497,10 +504,14 @@ class Model(Modellike):
             event_hash (str): _description_
         """
         self.store.xadd(event_hash, {nonce : nonce})
-        self.store.xgroup_create(event_hash, self.model_hostname)
+        try: 
+            self.store.xgroup_create(event_hash, self.model_hostname)
+        except Exception as e:
+            pass
+            # logging.exception(e)
+            # print("\t ^ The above will not prevent this model from attempting to start.")
+            
         self.store.xgroup_createconsumer(event_hash, self.model_hostname, self.consumer_id)
-        
-        print(event_hash)
         
         while True:
             time.sleep(0)
