@@ -1,10 +1,11 @@
 import asyncio
 import concurrent.futures
+from datetime import datetime
 import json
 import math
 import time
 import uuid
-from typing import Any, Awaitable, Callable, Dict, Protocol, Sequence, TypeVar
+from typing import Any, Awaitable, Callable, Dict, List, Optional, Protocol, Sequence, TypeVar
 import pycron
 
 import cattrs
@@ -13,15 +14,14 @@ import uvicorn
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-from tomlkit import datetime
 
-from model_builder.context.bounds.bounds import Bound
-from model_builder.context.context.context import Context, get_min_key
-from model_builder.context.execution.execution import Execution
-from model_builder.context.session.session import Session
-from model_builder.context.user.user import User, Userlike
-from model_builder.event.event import Event
-from model_builder.modifiers.state import private
+from gdg_model_builder.context.bounds.bounds import Bound
+from gdg_model_builder.context.context.context import Context, get_min_key
+from gdg_model_builder.context.execution.execution import Execution
+from gdg_model_builder.context.session.session import Session
+from gdg_model_builder.context.user.user import User, Userlike
+from gdg_model_builder.event.event import Event
+from gdg_model_builder.modifiers.state import private
 
 P = TypeVar("P")
 R = TypeVar("R")
@@ -32,11 +32,74 @@ CO = Callable[[Context, R], Awaitable[R]]
 
 EO = Callable[[Event, Context], Awaitable[R]]
 
-"""
-class ModelBuilderCallable(Protocol, P):
-    def __call__(self, *, context=Context, b: float) -> float:
-        pass
-"""
+LA = Callable[[int, Optional[int]], int]
+
+def poll(now : int, last : int):
+    return int(time.time())
+
+def secs(count : int)->LA:
+    def poll(now : int, last : int):
+        if last is None or (now - last)/1000 > count:
+            return int(time.time()/1000)
+        return -1
+    return poll
+
+def mins(count : int)->LA:
+    def poll(now : int, last : int):
+        if last is None or (now - last)/(1000 * 60) > count:
+            return int(time.time()/(1000 * 60))
+        return -1
+    return poll
+
+def hours(count : int)->LA:
+    def poll(now : int, last : int):
+        if last is None or (now - last)/(1000 * 60 * 60) > count:
+            return int(time.time()/(1000 * 60 * 60))
+        return -1
+    return poll
+
+def days(count : int)->LA:
+    def poll(now : int, last : int):
+        if last is None or (now - last)/(1000 * 60 * 60 * 24) > count:
+            return int(time.time()/(1000 * 60 * 60 * 24))
+        return -1
+    return poll
+
+def months(count : int)->LA:
+    def poll(now : int, last : int):
+        dt_now = datetime.fromtimestamp(now/1000)
+        dt_last = datetime.fromtimestamp(last/1000)
+        if last is None or (dt_now.month - dt_last.month) > count:
+            return dt_now.month
+        return -1
+    return poll
+
+def dow(which : int)->LA:
+    def poll(now : int, last : int):
+        dt_now = datetime.fromtimestamp(now/1000)
+        now_epoch_days = now/(1000 * 60 * 60 * 24)
+        last_epoch_days = now/(1000 * 60 * 60 * 24)
+        if dt_now.toordinal() % 7 == which and (last is None or now_epoch_days != last_epoch_days):
+            return now_epoch_days
+        return -1
+    return poll
+
+def date_once(*, which : str, format : str)->LA:
+    def poll(now : int, last : int):
+        date_str = datetime.strftime(which, format)
+        now_epoch_days = now/(1000 * 60 * 60 * 24)
+        now_str = datetime.fromtimestamp(now/1000).strftime(format)
+        if last is None and date_str == now_str:
+            return now_epoch_days
+        return -1
+    return poll
+    
+nonce = 'gamedaygurunoncenonotuseforanythingbutwhatisrecommendedherein'
+
+class CronEvent(Event):
+    
+    windows : str
+    valid : LA
 
 class Modellike(Protocol):
 
@@ -93,23 +156,23 @@ class Model(Modellike):
     
     store : redis.Redis
 
-    event_hashes : Dict[str, tuple[type, EO]] = {}
-    
-    cron_events : Dict[str, Event] = {}
+    event_handlers : Dict[str, List[tuple[type[Event], EO]]] = {}
+    cron_events : Dict[str, type[CronEvent]] = {}
+    cron_logs : Dict[str, int] = {}
 
     cron_pool = concurrent.futures.ThreadPoolExecutor()
     task_listener_pool = concurrent.futures.ThreadPoolExecutor()
     server_pool = concurrent.futures.ThreadPoolExecutor()
     
     get_methods : Dict[Context, Dict[str, AC]] = {}
-    
     set_methods : Dict[Context, Dict[str, AC]] = {}
-    
     reified_methods : Dict[str, AC] = {}
     
     consumer_id : str
     
     cron_window : int
+    
+    converter = cattrs.Converter()
 
 
     def __init__(self, /, *, store : redis.Redis = r, cron_window : int = 15) -> None:
@@ -268,22 +331,26 @@ class Model(Modellike):
         Raises:
             UninitializedEventException: _description_
         """
-        
-        event_hash = e.__class__.get_hash()
+        event_hash = e.get_event_hash()
         event_instance_hash = e.get_event_instance_hash()
-        if e.__class__.get_hash() not in self.event_hashes:
+        if event_hash not in self.event_handlers:
             raise UninitializedEventException()
         
         event_lock_addr = f"event:{event_hash}:{event_instance_hash}"
+        
+        if e.nonce and self.store.exists(event_lock_addr):
+            # someone has already posted this event
+            return
+        
         self.store.set(event_lock_addr, self.consumer_id)
         
-        lock_check = self.store.get(event_lock_addr)
+        lock_check = self.store.get(event_lock_addr).decode('utf-8')
         
         if(lock_check != self.consumer_id):
             # someone else hase the lock, someone else will dispatch
             return
-        
-        self.store.xadd(event_hash, cattrs.unstructure(e, e.__class__))
+
+        self.store.xadd(event_hash, e.__dict__)
 
     def _task(self, e : type[Event] = None)->Callable[[EO], EO]:
         """Initializes a task for model.
@@ -295,70 +362,96 @@ class Model(Modellike):
         Returns:
             EO: _description_
         """
-        event_hash = e.get_hash()
-        self.event_hashes[event_hash] = [e, EO]
+        event_hash = e.get_event_hash()
+        if event_hash not in self.event_handlers:
+            self.event_handlers[event_hash] = []
+        
         def decorator(func : EO):
             # def inner(e : EventType):
                 # self.store.xadd(event_hash, cattrs.unstructure(e,))
                 # nothing
+            self.event_handlers[event_hash].append([e, func])
             return func
         return decorator
     
-    def task(self, e : type[Event] = None, cron_str : str = None)->Callable[[EO], EO]:
+    def task(self, e : type[Event] = None, valid : str = None)->Callable[[EO], EO]:
         
         if e is not None:
             return self._task(e)
         
-        if e is None and cron_str is None:
+        if e is None and valid is None:
             raise Exception()
         
         if e is None:
-            print(cron_str)
-            cstr = cron_str
-            class Cron(Event):
-                fifteens : str
-                cron_str : str = cstr
+            vfunc = valid
+            class Cron(CronEvent):
+                windows : str
+                valid: LA = vfunc
                 
                 def __init__(self, windows : int) -> None:
                     super().__init__()
                     self.windows = windows
                 
-            self.cron_events[Cron.cron_str] = Cron
+            # add the cron class
+            self.cron_events[Cron.get_event_hash()] = Cron
+            
             return self._task(Cron)
                     
     def _run_cron(self, status : int):
          while True:
             time.sleep(self.cron_window) 
-            for cron_str in self.cron_events:
-                if pycron.is_now(cron_str):  
+            for key, event in self.cron_events.items():
+                now = int(time.time() * 1000)
+                window = event.valid(now, self.cron_logs.get(key))
+                if window > -1:
                     window = math.floor(time.time()/self.cron_window)
-                    cron_event = self.cron_events[cron_str](window)
+                    cron_event = event(window)
                     self.emit(cron_event)   
+                    self.cron_logs[key] = now
         
     async def run_cron(self, loop : asyncio.BaseEventLoop):
         return await loop.run_in_executor(self.cron_pool, self._run_cron, 1)
+    
 
-    def _listen_task(self, event_hash : str):
+    def handle_task(self, routine : EO, event : Event):
+        loop = asyncio.new_event_loop()
+        loop.run_until_complete(routine(event))
+        
+    def read_task_stream(self, event_hash : str):
+        
+        for resp in self.store.xreadgroup(self.consumer_id, self.consumer_id, {
+            event_hash : '>'
+        }, count=10, block=50):
+            _, messages = resp
+            for id, message in messages:
+                if nonce in message.keys():
+                    # we want to ignore nonces
+                    continue
+                for EventType, routine in self.event_handlers[event_hash]:
+                    self.handle_task(routine, EventType(message))
+
+    def _listen_task(self, event_hash : str, loop : asyncio.BaseEventLoop):
         """_summary_
 
         Args:
             event_hash (str): _description_
         """
-        self.store.xadd(event_hash, {"data" : "a"})
+        self.store.xadd(event_hash, {nonce : nonce})
         self.store.xgroup_create(event_hash, self.consumer_id)
         self.store.xgroup_createconsumer(event_hash, self.consumer_id, self.consumer_id)
         
         while True:
+            time.sleep(0)
             # may want to do some error handling here
-            self.store.xautoclaim(event_hash, self.consumer_id, self.consumer_id, min_idle_time=0, count=10)
+            # self.store.xautoclaim(event_hash, self.consumer_id, self.consumer_id, min_idle_time=0, count=10)
             # claim the event for yourself
-            for resp in self.store.xreadgroup(self.consumer_id, self.consumer_id, {
-                event_hash : 0
-            }):
-                _, messages = resp
-                task_type, routine = self.event_hashes[event_hash]
-                for message in messages:
-                    routine(cattrs.structure(message, task_type))
+
+            try:
+                self.read_task_stream(event_hash)
+            except Exception as e:
+                print(e)
+            
+      
     
     async def listen_task(self, event_hash : str, loop : asyncio.BaseEventLoop):
         """Listens to a task.
@@ -367,7 +460,7 @@ class Model(Modellike):
             event_hash (str): _description_
         """
         
-        return await loop.run_in_executor(self.task_listener_pool, self._listen_task, event_hash)
+        return await loop.run_in_executor(self.task_listener_pool, self._listen_task, event_hash, loop)
           
     
     async def listen_tasks(self, loop : asyncio.BaseEventLoop):
@@ -376,7 +469,7 @@ class Model(Modellike):
 
         return [
             await self.listen_task(id, loop)
-            for id in self.event_hashes
+            for id in self.event_handlers
         ]
     
     def _run_server(self, status : int):
@@ -399,8 +492,6 @@ class Model(Modellike):
 
 
     def start(self, loop : asyncio.BaseEventLoop = asyncio.get_event_loop()):
-        
-        print(self.cron_events)
         
         loop.run_until_complete(self._start(loop))
 
