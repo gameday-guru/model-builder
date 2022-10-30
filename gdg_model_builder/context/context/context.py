@@ -1,11 +1,13 @@
 from typing import Any, Dict, Protocol, Sequence
+import time
+import uuid
 
 from attrs import frozen
 
-from ..bounds.bounds import Bound, fminb
-from ..execution.execution import Executionlike
-from ..session.session import Sessionlike
-from ..user.user import Userlike
+from ..bounds.bounds import Bound, fminb, universal
+from ..execution.execution import Executionlike, Execution
+from ..session.session import Sessionlike, Session
+from ..user.user import Userlike, User
 
 
 class Contextlike(Protocol):
@@ -36,6 +38,21 @@ class Context(Contextlike):
     
     target : Bound
     
+root = Context(
+    key = "root",
+    target=universal,
+    user = User(
+        id = "root",
+        connection_id="root"
+    ),
+    session= Session(
+        id = "root",
+        exp=time.time() * 1000 + 60000
+    ),
+    execution=Execution(
+        id=uuid.uuid1().hex
+    )
+)
     
 def get_bounds_keys(context : Contextlike) -> Dict[Bound, str]:
     """Gets the keys for a set of bounds

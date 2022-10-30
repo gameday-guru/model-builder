@@ -1,3 +1,4 @@
+from datetime import datetime
 from gdg_model_builder import Model, private, session, spiodirect, universal, poll, secs, dow, Event
 
 class FriendlyEvent(Event):
@@ -36,7 +37,7 @@ async def say_hello(event = None):
     print("Hello")
 
 
-@my_model.task(valid=secs(5))
+@my_model.task(valid=secs(30))
 async def huzzah_hello(event = None):
     """Says huzzah
 
@@ -45,8 +46,6 @@ async def huzzah_hello(event = None):
     """
     my_model.emit(FriendlyEvent(note="Hey!"))
     print("huzzah")
-    # my_model.emit(FriendlyEvent())
-    # print("huzzah")
     
 @my_model.task(e=FriendlyEvent)
 async def huzzah_hello(event = None):
@@ -58,4 +57,6 @@ async def huzzah_hello(event = None):
     print("Goodday!")
 
 if __name__ == "__main__":
+    games = spiodirect.ncaab.get_games(datetime.strptime("2022 12 01", "%Y %m %d"))
+    teams = spiodirect.ncaab.get_teams()
     my_model.start()

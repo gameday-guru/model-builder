@@ -6,69 +6,70 @@ from dotenv import dotenv_values
 
 
 class Stadiumlike(BaseModel):
-    stadium_id: int
-    active: bool
-    name: str
-    address: None
-    city: str
-    state: str
-    zip: None
-    country: None
-    capacity: int
-    geo_lat: float
-    geo_long: float
+    StadiumID: int
+    Active: bool
+    Name: str
+    Address: Optional[str]
+    City: str
+    State: str
+    Zip: Optional[str]
+    Country: Optional[str]
+    Capacity: Optional[int]
+    GeoLat: Optional[float]
+    GeoLong: Optional[float]
 
 
 class Teamlike(BaseModel):
-    team_id: int
-    key: str
-    active: bool
-    school: str
-    name: str
-    ap_rank: None
-    wins: int
-    losses: int
-    conference_wins: int
-    conference_losses: int
-    global_team_id: int
-    conference_id: int
-    conference: str
-    team_logo_url: str
-    short_display_name: str
-    stadium: Stadiumlike
+    TeamID: int
+    Key: str
+    Active: bool
+    School: str
+    Name: str
+    ApRank: Optional[int]
+    Wins: Optional[int]
+    Losses: Optional[int]
+    ConferenceWins: Optional[int]
+    ConferenceLosses: Optional[int]
+    GlobalTeamID: int
+    ConferenceID: Optional[int]
+    Conference: Optional[str]
+    TeamLogoUrl: str
+    ShortDisplayName: str
+    Stadium: Optional[Stadiumlike]
+
 
 
 class Stadium(BaseModel):
-    stadium_id: int
-    active: bool
-    name: str
-    address: None
-    city: str
-    state: str
-    zip: None
-    country: None
-    capacity: int
-    geo_lat: float
-    geo_long: float
+    StadiumID: int
+    Active: bool
+    Name: str
+    Address: Optional[str]
+    City: str
+    State: str
+    Zip: Optional[str]
+    Country: Optional[str]
+    Capacity: Optional[int]
+    GeoLat: Optional[float]
+    GeoLong: Optional[float]
 
 
 class Team(BaseModel):
-    team_id: int
-    key: str
-    active: bool
-    school: str
-    name: str
-    ap_rank: None
-    wins: int
-    losses: int
-    conference_wins: int
-    conference_losses: int
-    global_team_id: int
-    conference_id: int
-    conference: str
-    team_logo_url: str
-    short_display_name: str
-    stadium: Stadiumlike
+    TeamID: int
+    Key: str
+    Active: bool
+    School: str
+    Name: str
+    ApRank: Optional[int]
+    Wins: Optional[int]
+    Losses: Optional[int]
+    ConferenceWins: Optional[int]
+    ConferenceLosses: Optional[int]
+    GlobalTeamID: int
+    ConferenceID: Optional[int]
+    Conference: Optional[str]
+    TeamLogoUrl: str
+    ShortDisplayName: str
+    Stadium: Optional[Stadiumlike]
 
 
 def get_teams()->Sequence[Teamlike]:

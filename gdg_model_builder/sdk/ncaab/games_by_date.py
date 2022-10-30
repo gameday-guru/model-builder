@@ -1,5 +1,6 @@
 from datetime import datetime
-from typing import Any, Callable, Dict, List, Protocol, TypeVar, cast
+from typing import Any, Callable, Dict, List, Protocol, TypeVar, cast, Optional
+from .team import Stadiumlike
 
 import requests
 from dotenv import dotenv_values
@@ -7,127 +8,127 @@ from pydantic import BaseModel
 
 
 class Periodlike(BaseModel):
-    period_id: int
-    game_id: int
-    number: int
-    name: str
-    type: str
-    away_score: int
-    home_score: int
+    PeriodID: int
+    GameID: int
+    Number: int
+    Name: str
+    Type: str
+    AwayScore: int
+    HomeScore: int
 
-class GamesByDatelike(BaseModel):
-    game_id: int
-    season: int
-    season_type: int
-    status: str
-    day: datetime
-    date_time: datetime
-    away_team: str
-    home_team: str
-    away_team_id: int
-    home_team_id: int
-    away_team_score: int
-    home_team_score: int
-    updated: datetime
-    period: str
-    time_remaining_minutes: None
-    time_remaining_seconds: None
-    point_spread: float
-    over_under: float
-    away_team_money_line: int
-    home_team_money_line: int
-    global_game_id: int
-    global_away_team_id: int
-    global_home_team_id: int
-    tournament_id: None
-    bracket: None
-    round: None
-    away_team_seed: None
-    home_team_seed: None
-    away_team_previous_game_id: None
-    home_team_previous_game_id: None
-    away_team_previous_global_game_id: None
-    home_team_previous_global_game_id: None
-    tournament_display_order: None
-    tournament_display_order_for_home_team: str
-    is_closed: bool
-    game_end_date_time: datetime
-    home_rotation_number: None
-    away_rotation_number: None
-    top_team_previous_game_id: None
-    bottom_team_previous_game_id: None
-    channel: None
-    neutral_venue: None
-    away_point_spread_payout: None
-    home_point_spread_payout: None
-    over_payout: None
-    under_payout: None
-    date_time_utc: datetime
-    stadium: None
-    periods: List[Periodlike]
+class GameByDatelike(BaseModel):
+    GameID: int
+    Season: int
+    SeasonType: int
+    Status: str
+    Day: datetime
+    DateTime: Optional[datetime]
+    AwayTeam: str
+    HomeTeam: str
+    AwayTeamID: int
+    HomeTeamID: int
+    AwayTeamScore: Optional[int]
+    HomeTeamScore: Optional[int]
+    Updated: datetime
+    Period: Optional[str]
+    TimeRemainingMinutes: Optional[int]
+    TimeRemainingSeconds: Optional[int]
+    PointSpread: Optional[float]
+    OverUnder: Optional[float]
+    AwayTeamMoneyLine: Optional[int]
+    HomeTeamMoneyLine: Optional[int]
+    GlobalGameID: int
+    GlobalAwayTeamID: int
+    GlobalHomeTeamID: int
+    TournamentID: Optional[str]
+    Bracket: Optional[str]
+    Round: Optional[str]
+    AwayTeamSeed: Optional[int]
+    HomeTeamSeed: Optional[int]
+    AwayTeamPreviousGameID: Optional[int]
+    HomeTeamPreviousGameID: Optional[int]
+    AwayTeamPreviousGlobalGameID: Optional[int]
+    HomeTeamPreviousGloablGameID: Optional[int]
+    TournamentDisplayOrder: Optional[int]
+    TournamentDisplayOrderForHomeTeam: str
+    IsClosed: bool
+    GameEndDateTime: Optional[datetime]
+    HomeRotationNumber: Optional[int]
+    AwayRotationNumber: Optional[int]
+    TopTeamPreviousGameID: Optional[str]
+    BottomTeamPreviousGameID: Optional[str]
+    Channel: Optional[str]
+    NeutralVenue: Optional[bool]
+    AwayPointSpreadPayout: Optional[str]
+    HomePointSpreadPayout: Optional[str]
+    OverPayout: Optional[str]
+    UnderPayout: Optional[str]
+    DateTimeUTC: Optional[datetime]
+    Stadium: Optional[Stadiumlike]
+    Periods: List[Periodlike]
     
 class Period(BaseModel):
-    period_id: int
-    game_id: int
-    number: int
-    name: str
-    type: str
-    away_score: int
-    home_score: int
+    PeriodID: int
+    GameID: int
+    Number: int
+    Name: str
+    Type: str
+    AwayScore: int
+    HomeScore: int
 
 class GameByDate(BaseModel):
-    game_id: int
-    season: int
-    season_type: int
-    status: str
-    day: datetime
-    date_time: datetime
-    away_team: str
-    home_team: str
-    away_team_id: int
-    home_team_id: int
-    away_team_score: int
-    home_team_score: int
-    updated: datetime
-    period: str
-    time_remaining_minutes: None
-    time_remaining_seconds: None
-    point_spread: float
-    over_under: float
-    away_team_money_line: int
-    home_team_money_line: int
-    global_game_id: int
-    global_away_team_id: int
-    global_home_team_id: int
-    tournament_id: None
-    bracket: None
-    round: None
-    away_team_seed: None
-    home_team_seed: None
-    away_team_previous_game_id: None
-    home_team_previous_game_id: None
-    away_team_previous_global_game_id: None
-    home_team_previous_global_game_id: None
-    tournament_display_order: None
-    tournament_display_order_for_home_team: str
-    is_closed: bool
-    game_end_date_time: datetime
-    home_rotation_number: None
-    away_rotation_number: None
-    top_team_previous_game_id: None
-    bottom_team_previous_game_id: None
-    channel: None
-    neutral_venue: None
-    away_point_spread_payout: None
-    home_point_spread_payout: None
-    over_payout: None
-    under_payout: None
-    date_time_utc: datetime
-    stadium: None
-    periods: List[Periodlike]
+    GameID: int
+    Season: int
+    SeasonType: int
+    Status: str
+    Day: datetime
+    DateTime: Optional[datetime]
+    AwayTeam: str
+    HomeTeam: str
+    AwayTeamID: int
+    HomeTeamID: int
+    AwayTeamScore: Optional[int]
+    HomeTeamScore: Optional[int]
+    Updated: datetime
+    Period: Optional[str]
+    TimeRemainingMinutes: Optional[int]
+    TimeRemainingSeconds: Optional[int]
+    PointSpread: Optional[float]
+    OverUnder: Optional[float]
+    AwayTeamMoneyLine: Optional[int]
+    HomeTeamMoneyLine: Optional[int]
+    GlobalGameID: int
+    GlobalAwayTeamID: int
+    GlobalHomeTeamID: int
+    TournamentID: Optional[str]
+    Bracket: Optional[str]
+    Round: Optional[str]
+    AwayTeamSeed: Optional[int]
+    HomeTeamSeed: Optional[int]
+    AwayTeamPreviousGameID: Optional[int]
+    HomeTeamPreviousGameID: Optional[int]
+    AwayTeamPreviousGlobalGameID: Optional[int]
+    HomeTeamPreviousGloablGameID: Optional[int]
+    TournamentDisplayOrder: Optional[int]
+    TournamentDisplayOrderForHomeTeam: str
+    IsClosed: bool
+    GameEndDateTime: Optional[datetime]
+    HomeRotationNumber: Optional[int]
+    AwayRotationNumber: Optional[int]
+    TopTeamPreviousGameID: Optional[str]
+    BottomTeamPreviousGameID: Optional[str]
+    Channel: Optional[str]
+    NeutralVenue: Optional[bool]
+    AwayPointSpreadPayout: Optional[str]
+    HomePointSpreadPayout: Optional[str]
+    OverPayout: Optional[str]
+    UnderPayout: Optional[str]
+    DateTimeUTC: Optional[datetime]
+    Stadium: Optional[Stadiumlike]
+    Periods: List[Periodlike]
 
 
-def get_games(date : datetime) -> List[GamesByDatelike]:
+def get_games(date : datetime) -> List[GameByDatelike]:
     """Gets games by date directly from sportsdataio
 
     Args:
