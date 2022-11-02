@@ -4,12 +4,15 @@ from datetime import datetime
 import json
 import logging
 import math
+import os
 import time
 import uuid
 from typing import Any, Awaitable, Callable, Dict, List, Optional, Protocol, Sequence, TypeVar
-import pycron
+from hashlib import sha256
+from json import dumps
 
 import cattrs
+from checksumdir import dirhash
 import redis
 import uvicorn
 from fastapi import FastAPI, HTTPException
@@ -34,6 +37,11 @@ CO = Callable[[Context, R], Awaitable[R]]
 EO = Callable[[Event, Context], Awaitable[R]]
 
 LA = Callable[[int, Optional[int]], int]
+
+def init(now : int, last : Optional[int]):
+    if last is None:
+        return 1
+    return -1
 
 def poll(now : int, last : int):
     return int(time.time())
@@ -108,6 +116,10 @@ class CronEvent(Event):
     
     windows : str
     valid : LA
+    
+class Init(Event):
+    
+    init : int = 1
 
 class Modellike(Protocol):
 
@@ -480,7 +492,11 @@ class Model(Modellike):
         loop.run_until_complete(routine(event))
         
     def read_task_stream(self, event_hash : str):
-    
+        """_summary_
+
+        Args:
+            event_hash (str): _description_
+        """
             
         for resp in self.store.xreadgroup(self.model_hostname, self.consumer_id, {
             event_hash : '>'
@@ -509,7 +525,6 @@ class Model(Modellike):
         except Exception as e:
             pass
             # logging.exception(e)
-            # print("\t ^ The above will not prevent this model from attempting to start.")
             
         self.store.xgroup_createconsumer(event_hash, self.model_hostname, self.consumer_id)
         
@@ -533,10 +548,77 @@ class Model(Modellike):
         """
         return await loop.run_in_executor(self.task_listener_pool, self._listen_task, event_hash, loop)
           
+          
+    async def listen_init(self):
+        
+        Init.model_hostname = self.model_hostname
+        event_hash  = self.get_relative_event_hash(Init)
+        init_key = self.get_init_key()
+    
+        # make sure there's at least one event handler
+        if Init.get_event_hash() not in self.event_handlers:
+            @self.task(e=Init)
+            def handle_init(e):
+                print("Initializing...")
+                return
+           
+         # emit the init event 
+        self.emit(Init(init=init_key))
+        
+        # read the stream for the init event
+        
+        self.store.xadd(event_hash, {nonce : nonce})
+        try: 
+            self.store.xgroup_create(event_hash, self.model_hostname)
+        except Exception as e:
+            pass
+            
+        self.store.xgroup_createconsumer(event_hash, self.model_hostname, self.consumer_id)
+        while not self.store.exists(init_key):
+        
+            for resp in self.store.xreadgroup(self.model_hostname, self.consumer_id, {
+                event_hash : '>'
+            }, count=10, block=1000):
+                _, messages = resp
+                
+                for id, message in messages:
+                    if nonce in [key.decode('utf-8') for key in message.keys()]:
+                        # we want to ignore nonces
+                        continue
+                    for EventType, routine in self.event_handlers[event_hash]:
+                        d = {}
+                        for key, value in message.items():
+                            d[key.decode('utf-8')] = value.decode('utf-8')
+                        routine(EventType(**d))
+                        self.store.set(init_key, 1)
+        
+    def get_instance_hash(self):
+        """_summary_
+
+        Returns:
+            _type_: _description_
+        """
+        cls = self.__class__
+        obj_hash = sha256()
+        obj_hash.update(cls.__name__.encode('utf-8'))
+        obj_hash.update(str(self.model_hostname).encode('utf-8'))
+        obj_hash.update(dirhash(os.getcwd()).encode('utf-8'))
+        return obj_hash.digest().hex()
+    
+    def get_init_key(self):
+        """_summary_
+
+        Returns:
+            _type_: _description_
+        """
+        return self.get_instance_hash()
     
     async def listen_tasks(self, loop : asyncio.BaseEventLoop):
         """Listens for tasks
         """
+        
+        await self.listen_init()
+        
         return await asyncio.gather(*[
             self.listen_task(id, loop)
             for id in self.event_handlers

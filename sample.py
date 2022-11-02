@@ -1,4 +1,5 @@
 from datetime import datetime
+import json
 from gdg_model_builder import Model, private, session, spiodirect, universal, poll, secs, dow, Event
 
 class FriendlyEvent(Event):
@@ -37,7 +38,7 @@ async def say_hello(event = None):
     print("Hello")
 
 
-@my_model.task(valid=secs(30))
+@my_model.task(valid=secs(5))
 async def huzzah_hello(event = None):
     """Says huzzah
 
@@ -59,4 +60,10 @@ async def huzzah_hello(event = None):
 if __name__ == "__main__":
     games = spiodirect.ncaab.get_games(datetime.strptime("2022 12 01", "%Y %m %d"))
     teams = spiodirect.ncaab.get_teams()
+    with open("./teams.json", 'a') as f:
+        f.write("[ \n")
+        for team in teams:
+            f.write(team.json())
+            f.write(", \n")
+        f.write("\n ]")
     my_model.start()
