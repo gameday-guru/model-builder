@@ -58,12 +58,5 @@ async def huzzah_hello(event = None):
     print("Goodday!")
 
 if __name__ == "__main__":
-    games = spiodirect.ncaab.get_games(datetime.strptime("2022 12 01", "%Y %m %d"))
-    teams = spiodirect.ncaab.get_teams()
-    with open("./teams.json", 'a') as f:
-        f.write("[ \n")
-        for team in teams:
-            f.write(team.json())
-            f.write(", \n")
-        f.write("\n ]")
+    spiodirect.ncaab.get_game_stats_by_date(datetime.strptime("2021 12 01", "%Y %m %d"))
     my_model.start()
