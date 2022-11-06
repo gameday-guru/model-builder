@@ -32,6 +32,7 @@ R = TypeVar("R")
 RR = TypeVar("RR", bound=BaseModel)
 
 AC = Callable[[P], Awaitable[R]]
+CG = Callable[[Context], Awaitable[R]]
 CO = Callable[[Context, R], Awaitable[R]]
 
 EO = Callable[[Event, Context], Awaitable[R]]
@@ -128,12 +129,12 @@ class Modellike(Protocol):
         """
         pass
 
-    def get(self, func : CO, key : str, *args, t : type[R])->Callable[[CO], CO]:
+    def get(self, func : CO, key : str, *args, t : type[R])->Callable[[CO[R]], CG[R]]:
         """Binds a retrieviable state to the model
         """
         pass
 
-    def set(self, func : CO, key : str, *args,  value : R, t : type[R])->Callable[[CO], CO]:
+    def set(self, func : CO, key : str, *args,  value : R, t : type[R])->Callable[[CO[R]], CO[R]]:
         """_summary_
         """
         pass
@@ -221,7 +222,7 @@ class Model(Modellike):
             return func
         return decorator
 
-    def get(self, key : str, *args, t : type[R])->Callable[[CO], CO]:
+    def get(self, key : str, *args, t : type[R])->Callable[[CO[R]], CG[R]]:
         """Binds a get method to the model.
 
         Args:
@@ -285,7 +286,7 @@ class Model(Modellike):
     def get_inner_key(self, key : str):
         return f"{self.model_hostname}:{key}" 
 
-    def set(self, key : str, *args, t : type[R])->Callable[[CO], CO]:
+    def set(self, key : str, *args, t : type[R])->Callable[[CO[R]], CO[R]]:
         """Binds a set method to the model.
 
         Args:

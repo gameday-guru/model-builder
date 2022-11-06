@@ -1,6 +1,7 @@
 from datetime import datetime
 import json
 from gdg_model_builder import Model, private, session, spiodirect, universal, Init, poll, secs, dow, Event
+from pydantic import BaseModel
 
 class FriendlyEvent(Event):
     note : str = "love"
@@ -12,6 +13,9 @@ class FriendlyEvent(Event):
 # create a model
 my_model = Model(cron_window=1)
 
+class Thing(BaseModel):
+    first : str
+
 @my_model.method()
 async def hello_world():
     return "Hello, world!"
@@ -22,6 +26,11 @@ async def whose_world_global(context, val):
 
 @my_model.get("whose_house", session, t=str)
 async def get_whose_world_user(context, val):
+    thing = await get_thing(context)
+    return val
+
+@my_model.get("thing", session, t=Thing)
+async def get_thing(context, val):
     return val
 
 @my_model.set("whose_house", session, t=str)
