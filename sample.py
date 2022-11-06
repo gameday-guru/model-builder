@@ -1,6 +1,6 @@
 from datetime import datetime
 import json
-from gdg_model_builder import Model, private, session, spiodirect, universal, poll, secs, dow, Event
+from gdg_model_builder import Model, private, session, spiodirect, universal, Init, poll, secs, dow, Event
 
 class FriendlyEvent(Event):
     note : str = "love"
@@ -56,7 +56,16 @@ async def huzzah_hello(event = None):
         event (_type_, optional): _description_. Defaults to None.
     """
     print("Goodday!")
+    
+@my_model.task(e=Init)
+async def first(event = None):
+    """Says huzzah
+
+    Args:
+        event (_type_, optional): _description_. Defaults to None.
+    """
+    print("First!")
 
 if __name__ == "__main__":
-    spiodirect.ncaab.get_game_stats_by_date(datetime.strptime("2021 12 01", "%Y %m %d"))
+    spiodirect.ncaab.get_team_season_stats_by_date(datetime.strptime("2022 12 01", "%Y %m %d"))
     my_model.start()

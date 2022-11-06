@@ -558,7 +558,7 @@ class Model(Modellike):
         # make sure there's at least one event handler
         if Init.get_event_hash() not in self.event_handlers:
             @self.task(e=Init)
-            def handle_init(e):
+            async def handle_init(e):
                 print("Initializing...")
                 return
            
@@ -589,7 +589,7 @@ class Model(Modellike):
                         d = {}
                         for key, value in message.items():
                             d[key.decode('utf-8')] = value.decode('utf-8')
-                        routine(EventType(**d))
+                        await routine(EventType(**d))
                         self.store.set(init_key, 1)
         
     def get_instance_hash(self):

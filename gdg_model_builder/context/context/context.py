@@ -1,5 +1,5 @@
 from typing import Any, Dict, Protocol, Sequence
-import time
+from time import time
 import uuid
 
 from attrs import frozen
@@ -47,7 +47,7 @@ root = Context(
     ),
     session= Session(
         id = "root",
-        exp=time.time() * 1000 + 60000
+        exp=time() * 1000 + 60000
     ),
     execution=Execution(
         id=uuid.uuid1().hex

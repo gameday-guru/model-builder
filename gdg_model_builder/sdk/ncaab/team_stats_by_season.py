@@ -6,39 +6,30 @@ from dotenv import dotenv_values
 from pydantic import BaseModel
 from json import dumps
 
-class TeamGameStatsByDatelike(BaseModel):
+class TeamSeasonStatslike(BaseModel):
     StatID : int
     TeamID : int
     SeasonType : int
     Season : int
     Name : str
-    Team : str
+    Team : Optional[str]
     Wins : Optional[int]
     Losses : Optional[int]
     ConferenceWins : Optional[int]
     ConferenceLosses : Optional[int]
-    GlobalTeamID : Optional[int]
-    Possessions : Optional[int]
-    GameID : int
-    OpponentID : int
-    Opponent : str
-    Day : Optional[datetime]
-    DateTime : Optional[datetime]
-    HomeOrAway : str
-    IsGameOver : bool
-    GlobalGameID : int
-    GlobalOpponentID : int
-    Updated : Optional[datetime]
+    GlobalTeamID: int
+    Possessions : float
+    Updated : datetime
     Games : int
-    FantasyPoints : Optional[float]
-    Minutes : Optional[int]
+    FantasyPoints : float
+    Minutes : int
     FieldGoalsMade : int
     FieldGoalsAttempted : int
-    FieldGoalsPercentage : int
+    FieldGoalsPercentage : float
     EffectiveFieldGoalsPercentage : float
     TwoPointersMade : int
     TwoPointersAttempted : int
-    TwoPointersPercentage : float
+    TwoPointersPercentage : int
     ThreePointersMade : int
     ThreePointersAttempted : int
     ThreePointersPercentage : float
@@ -56,52 +47,43 @@ class TeamGameStatsByDatelike(BaseModel):
     BlockedShots : int
     Turnovers : int
     PersonalFouls : int
-    Points : Optional[int]
+    Points: int
     TrueShootingAttempts : float
     TrueShootingPercentage : float
     PlayerEfficiencyRating : Optional[float]
-    AssistsPercentage : Optional[float]
-    StealsPercentage : Optional[float]
-    BlocksPercentage : Optional[float]
-    TurnOversPercentage : Optional[float]
-    UsageRatePercentage : Optional[float]
-    FantasyPointsFanDuel : Optional[float]
-    FantasyPointsDraftKings : Optional[float]
-    FantasyPointsYahoo : Optional[float]
-
-class TeamGameStatsByDate(BaseModel):
+    AssistsPercentage :  Optional[float]
+    StealsPercentage :  Optional[float]
+    BlocksPercentage :  Optional[float]
+    TurnOversPercentage :  Optional[float]
+    UsageRatePercentage :  Optional[float]
+    FantasyPointsFanDuel :  Optional[float]
+    FantasyPointsDraftKings :  Optional[float]
+    FantasyPointsYahoo :  Optional[float]
+    
+class TeamSeasonStats(BaseModel):
     StatID : int
     TeamID : int
     SeasonType : int
     Season : int
     Name : str
-    Team : str
+    Team : Optional[str]
     Wins : Optional[int]
     Losses : Optional[int]
     ConferenceWins : Optional[int]
     ConferenceLosses : Optional[int]
-    GlobalTeamID : Optional[int]
-    Possessions : Optional[int]
-    GameID : int
-    OpponentID : int
-    Opponent : str
-    Day : Optional[datetime]
-    DateTime : Optional[datetime]
-    HomeOrAway : str
-    IsGameOver : bool
-    GlobalGameID : int
-    GlobalOpponentID : int
-    Updated : Optional[datetime]
+    GlobalTeamID: int
+    Possessions : float
+    Updated : datetime
     Games : int
-    FantasyPoints : Optional[float]
-    Minutes : Optional[int]
+    FantasyPoints : float
+    Minutes : int
     FieldGoalsMade : int
     FieldGoalsAttempted : int
-    FieldGoalsPercentage : int
+    FieldGoalsPercentage : float
     EffectiveFieldGoalsPercentage : float
     TwoPointersMade : int
     TwoPointersAttempted : int
-    TwoPointersPercentage : float
+    TwoPointersPercentage : int
     ThreePointersMade : int
     ThreePointersAttempted : int
     ThreePointersPercentage : float
@@ -119,21 +101,20 @@ class TeamGameStatsByDate(BaseModel):
     BlockedShots : int
     Turnovers : int
     PersonalFouls : int
-    Points : Optional[int]
+    Points: int
     TrueShootingAttempts : float
     TrueShootingPercentage : float
     PlayerEfficiencyRating : Optional[float]
-    AssistsPercentage : Optional[float]
-    StealsPercentage : Optional[float]
-    BlocksPercentage : Optional[float]
-    TurnOversPercentage : Optional[float]
-    UsageRatePercentage : Optional[float]
-    FantasyPointsFanDuel : Optional[float]
-    FantasyPointsDraftKings : Optional[float]
-    FantasyPointsYahoo : Optional[float]
+    AssistsPercentage :  Optional[float]
+    StealsPercentage :  Optional[float]
+    BlocksPercentage :  Optional[float]
+    TurnOversPercentage :  Optional[float]
+    UsageRatePercentage :  Optional[float]
+    FantasyPointsFanDuel :  Optional[float]
+    FantasyPointsDraftKings :  Optional[float]
+    FantasyPointsYahoo :  Optional[float]
 
-
-def get_game_stats_by_date(date : datetime) -> List[TeamGameStatsByDatelike]:
+def get_team_season_stats_by_date(date : datetime) -> List[TeamSeasonStats]:
     """Gets games by date directly from sportsdataio
 
     Args:
@@ -144,9 +125,9 @@ def get_game_stats_by_date(date : datetime) -> List[TeamGameStatsByDatelike]:
     """
     domain = dotenv_values()["SPORTS_DATA_DOMAIN"]
     json = requests.get(
-        f"{domain}/v3/cbb/scores/json/TeamGameStatsByDate/{date.year}-{date.month}-{date.day}",
+        f"{domain}/v3/cbb/scores/json/TeamSeasonStats/{date.year}",
         params={
             "key" : dotenv_values()["SPORTS_DATA_KEY"]
         }
     ).json()
-    return [TeamGameStatsByDate.parse_obj(entry) for entry in json]
+    return [TeamSeasonStats.parse_obj(obj) for obj in json]
