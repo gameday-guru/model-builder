@@ -54,7 +54,7 @@ root = Context(
     )
 )
     
-def get_bounds_keys(context : Contextlike) -> Dict[Bound, str]:
+def get_bounds_keys(context : Contextlike, key : str = None) -> Dict[Bound, str]:
     """Gets the keys for a set of bounds
 
     Args:
@@ -64,7 +64,7 @@ def get_bounds_keys(context : Contextlike) -> Dict[Bound, str]:
         Dict[Bound, str]: _description_
     """
     
-    universal = context.key
+    universal = key or context.key
     user = f"{universal}:{context.user.id}"
     session = f"{user}:{context.session.id}"
     execution = f"{session}:{context.execution.id}"
@@ -92,16 +92,12 @@ def get_min_key(*, bounds : Sequence[Any], key : str, context : Contextlike) -> 
     Returns:
         str: _description_
     """
-    """
-    if key != context.key:
-        raise ContextkeyException()
-    """
     
     min_bound = fminb(bounds)
     if min_bound.value > context.target.value:
         min_bound = context.target
 
         
-    return get_bounds_keys(context)[min_bound] or context.key
+    return get_bounds_keys(context, key)[min_bound] or context.key or key
 
         

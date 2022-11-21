@@ -1,7 +1,8 @@
 from datetime import datetime
 import json
-from gdg_model_builder import Model, private, session, spiodirect, universal, Init, poll, secs, dow, Event
+from gdg_model_builder import Model, private, session, spiodirect, universal, Init, poll, secs, dow, days, Event
 from pydantic import BaseModel
+import uuid
 
 class FriendlyEvent(Event):
     note : str = "love"
@@ -47,34 +48,22 @@ async def say_hello(event = None):
     print("Hello")
 
 
-@my_model.task(valid=secs(5))
-async def huzzah_hello(event = None):
-    """Says huzzah
-
-    Args:
-        event (_type_, optional): _description_. Defaults to None.
-    """
-    my_model.emit(FriendlyEvent(note="Hey!"))
-    print("huzzah")
-    
-@my_model.task(e=FriendlyEvent)
-async def huzzah_hello(event = None):
-    """Says huzzah
-
-    Args:
-        event (_type_, optional): _description_. Defaults to None.
-    """
-    print("Goodday!")
-    
 @my_model.task(e=Init)
-async def first(event = None):
+async def what(event = None):
+    print("Initializing...")
+
+@my_model.task(valid=days(1))
+async def huzzah_hello(event = None):
     """Says huzzah
 
     Args:
         event (_type_, optional): _description_. Defaults to None.
     """
-    print("First!")
+    print("Retrodating!...")
 
 if __name__ == "__main__":
-    spiodirect.ncaab.get_team_season_stats_by_date(datetime.strptime("2022 12 01", "%Y %m %d"))
+    my_model.retrodate = datetime.strptime("2022 11 18", "%Y %m %d").timestamp()
+    # my_model.model_hostname = uuid.uuid1().bytes
+    # my_model.model_hostname = "hello"
+    # test
     my_model.start()

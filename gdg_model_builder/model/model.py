@@ -26,6 +26,7 @@ from gdg_model_builder.context.session.session import Session
 from gdg_model_builder.context.user.user import User, Userlike
 from gdg_model_builder.event.event import Event, exclusive, iproxy, pproxy
 from gdg_model_builder.modifiers.state import private
+import os
 
 P = TypeVar("P")
 R = TypeVar("R")
@@ -50,7 +51,7 @@ def poll(now : int, last : int):
 def secs(count : int)->LA:
     def _secs(now : int, last : int):
         if last is None or (now - last)/1000 > count:
-            return int(time.time()/1000)
+            return now
         return -1
     _secs.__name__ = f"_secs_{count}"
     return _secs
@@ -58,7 +59,7 @@ def secs(count : int)->LA:
 def mins(count : int)->LA:
     def _mins(now : int, last : int):
         if last is None or (now - last)/(1000 * 60) > count:
-            return int(time.time()/(1000 * 60))
+            return now
         return -1
     _mins.__name__ = f"_mins_{count}"
     return _mins
@@ -66,7 +67,7 @@ def mins(count : int)->LA:
 def hours(count : int)->LA:
     def _hours(now : int, last : int):
         if last is None or (now - last)/(1000 * 60 * 60) > count:
-            return int(time.time()/(1000 * 60 * 60))
+            return now
         return -1
     _hours.__name__ = f"_hours_{count}"
     return _hours
@@ -74,7 +75,7 @@ def hours(count : int)->LA:
 def days(count : int)->LA:
     def _days(now : int, last : int):
         if last is None or (now - last)/(1000 * 60 * 60 * 24) > count:
-            return int(time.time()/(1000 * 60 * 60 * 24))
+            return now
         return -1
     _days.__name__ = f"_days_{count}"
     return _days
@@ -84,7 +85,7 @@ def months(count : int)->LA:
         dt_now = datetime.fromtimestamp(now/1000)
         dt_last = datetime.fromtimestamp(last/1000)
         if last is None or (dt_now.month - dt_last.month) > count:
-            return dt_now.month
+            return now
         return -1
     _months.__name__ = f"_months_{count}"
     return _months
@@ -95,7 +96,7 @@ def dow(which : int)->LA:
         now_epoch_days = now/(1000 * 60 * 60 * 24)
         last_epoch_days = now/(1000 * 60 * 60 * 24)
         if dt_now.toordinal() % 7 == which and (last is None or now_epoch_days != last_epoch_days):
-            return now_epoch_days
+            return now
         return -1
     _dow.__name__ = f"_months_{which}"
     return _dow
@@ -106,7 +107,7 @@ def date_once(*, which : str, format : str)->LA:
         now_epoch_days = now/(1000 * 60 * 60 * 24)
         now_str = datetime.fromtimestamp(now/1000).strftime(format)
         if last is None and date_str == now_str:
-            return now_epoch_days
+            return now
         return -1
     _date_once.__name__ = f"_months_{which}_{format}"
     return _date_once
@@ -115,7 +116,7 @@ nonce = 'gamedaygurunoncenonotuseforanythingbutwhatisrecommendedherein'
 
 class CronEvent(Event):
     
-    windows : str
+    ts : float
     valid : LA
     
 class Init(Event):
@@ -160,6 +161,9 @@ class Modellike(Protocol):
     async def start(self):
         pass
     
+    async def sim(self):
+        pass
+    
 r = redis.Redis(host='localhost', port=6379, db=0)
 
 class PrivateMethodException(Exception):
@@ -172,6 +176,10 @@ class ExclusiveEmitError(Exception):
     pass
 
 class Model(Modellike):
+    
+    timefactor : int = 1
+    retrodate : Optional[float] = None
+    start_time : int = 0
     
     model_hostname : str = "0"
 
@@ -235,11 +243,11 @@ class Model(Modellike):
         """
         class Model(BaseModel):
             data : t
-        
+
         def decorator(func : CO):
 
             async def inner(context : Context, *args):
-                obj = Model.parse_raw(self.store.lrange(get_min_key(bounds=args, key=key, context=context), 0, 0)[0])
+                obj = Model.parse_raw(self.store.lrange(get_min_key(bounds=args, key=self.get_inner_key(key), context=context), 0, 0)[0])
                 return await func(context, obj.data)
             
             # register inner with get_methods map
@@ -300,7 +308,7 @@ class Model(Modellike):
         """
         class Model(BaseModel):
             data : t
-            
+        
         def decorator(func : CO):
             async def inner(context : Context, value : R):
                 val : R = await func(context, value)
@@ -402,7 +410,7 @@ class Model(Modellike):
 
     
         event_lock_addr = self.get_event_lock_addr(e)
-        
+
         if e.nonce and self.store.exists(event_lock_addr):
             return
     
@@ -413,6 +421,7 @@ class Model(Modellike):
         if(lock_check != self.consumer_id):
             # someone else hase the lock, someone else will dispatch
             return
+    
 
         d = e.__dict__.copy()
         self.store.xadd(event_hash, d)
@@ -458,13 +467,13 @@ class Model(Modellike):
                 # include in model
                 model_hostname: Optional[str] = self.model_hostname
                 
-                windows : str
+                ts : float
                 valid: LA = vfunc
                 id : str = vfunc.__name__
 
-                def __init__(self, *, windows : int) -> None:
+                def __init__(self, *, ts : float) -> None:
                     super().__init__()
-                    self.windows = windows
+                    self.ts = ts
                     
             Cron.__name__ = vfunc.__name__
             # add the cron class
@@ -476,18 +485,39 @@ class Model(Modellike):
          while True:
             time.sleep(self.cron_window) 
             for key, event in self.cron_events.items():
-                now = int(time.time() * 1000)
-                window = event.valid(now, self.cron_logs.get(key))
-                if window > -1:
-                    window = math.floor(time.time()/self.cron_window)
-                    cron_event = event(windows=window)
+                now = self.start_time + int((time.time() - self.start_time) * self.timefactor * 1000)
+                method_now = event.valid(now, self.cron_logs.get(key))
+                if method_now > -1:
+                    cron_event = event(ts=method_now)
                     self.emit(cron_event)   
-                    self.cron_logs[key] = now
-        
-    async def run_cron(self, loop : asyncio.BaseEventLoop):
-        return await loop.run_in_executor(self.cron_pool, self._run_cron, 1)
-    
+                    self.cron_logs[key] = method_now
 
+          
+    def run_retrodate(self, start : float):
+        flag = True
+        timiter = start
+        while flag: 
+            time.sleep(0) # we want this to cycle through as fast as possible, but yield the procesor
+            # we need to make sure this runs not just up to the time at which the loop began
+            # but up to the actual time when the loop would finish
+            for key, event in self.cron_events.items():
+                method_now = event.valid(timiter * 1000, self.cron_logs.get(key))
+                if method_now > -1:
+                    cron_event = event(ts=method_now)
+                    self.emit(cron_event)   
+                    self.cron_logs[key] = method_now
+
+            if timiter > time.time():
+                flag = False
+            timiter += 1
+    
+    async def run_cron(self, loop : asyncio.BaseEventLoop):
+        
+        if self.retrodate is not None: # retrodate the cron loop if possible
+            self.run_retrodate(self.retrodate)
+        
+        return await loop.run_in_executor(self.cron_pool, self._run_cron, 1)
+            
     def handle_task(self, routine : EO, event : Event):
         loop = asyncio.new_event_loop()
         loop.run_until_complete(routine(event))
@@ -498,7 +528,6 @@ class Model(Modellike):
         Args:
             event_hash (str): _description_
         """
-            
         for resp in self.store.xreadgroup(self.model_hostname, self.consumer_id, {
             event_hash : '>'
         }, count=10, block=100):
@@ -547,27 +576,15 @@ class Model(Modellike):
         Args:
             event_hash (str): _description_
         """
-        return await loop.run_in_executor(self.task_listener_pool, self._listen_task, event_hash, loop)
-          
-          
-    async def listen_init(self):
+        loop.run_in_executor(self.task_listener_pool, self._listen_task, event_hash, loop)
+        return
+    
+    async def _listen_init(self):
         
-        Init.model_hostname = self.model_hostname
         event_hash  = self.get_relative_event_hash(Init)
         init_key = self.get_init_key()
-    
-        # make sure there's at least one event handler
-        if Init.get_event_hash() not in self.event_handlers:
-            @self.task(e=Init)
-            async def handle_init(e):
-                print("Initializing...")
-                return
-           
-         # emit the init event 
-        self.emit(Init(init=init_key))
-        
-        # read the stream for the init event
-        
+        print("Init key...", init_key, event_hash)
+          
         self.store.xadd(event_hash, {nonce : nonce})
         try: 
             self.store.xgroup_create(event_hash, self.model_hostname)
@@ -576,7 +593,7 @@ class Model(Modellike):
             
         self.store.xgroup_createconsumer(event_hash, self.model_hostname, self.consumer_id)
         while not self.store.exists(init_key):
-        
+            time.sleep(1)
             for resp in self.store.xreadgroup(self.model_hostname, self.consumer_id, {
                 event_hash : '>'
             }, count=10, block=1000):
@@ -592,6 +609,33 @@ class Model(Modellike):
                             d[key.decode('utf-8')] = value.decode('utf-8')
                         await routine(EventType(**d))
                         self.store.set(init_key, 1)
+                        
+        return True
+          
+    async def listen_init(self):
+        
+        Init.model_hostname = self.model_hostname
+        event_hash  = self.get_relative_event_hash(Init)
+        init_key = self.get_init_key()
+        print("Init key...", init_key, event_hash)
+        # hello next
+    
+        # make sure there's at least one event handler
+        if Init.get_event_hash() not in self.event_handlers:
+            @self.task(e=Init)
+            async def handle_init(e):
+                return
+        
+        async def emit_init():
+            print("Emitting init...")
+            self.emit(Init(init=init_key))
+            return True
+        
+        return await asyncio.gather(
+            emit_init(),
+            self._listen_init()
+        )
+        
         
     def get_instance_hash(self):
         """_summary_
@@ -637,8 +681,11 @@ class Model(Modellike):
         return await loop.run_in_executor(self.server_pool, self._run_server, 1)
     
     async def _start(self, loop : asyncio.BaseEventLoop = asyncio.get_event_loop()):
+        
+        # make sure you're listening to the tasks first
+        await self.listen_tasks(loop)
+        
         return await asyncio.gather(
-            self.listen_tasks(loop),
             self.run_cron(loop),
             self.run_server(loop)
         )
