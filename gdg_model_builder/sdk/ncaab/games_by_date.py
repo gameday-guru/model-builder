@@ -13,8 +13,8 @@ class Periodlike(BaseModel):
     Number: int
     Name: str
     Type: str
-    AwayScore: int
-    HomeScore: int
+    AwayScore: Optional[int]
+    HomeScore: Optional[int]
 
 class GameByDatelike(BaseModel):
     GameID: int
@@ -73,8 +73,8 @@ class Period(BaseModel):
     Number: int
     Name: str
     Type: str
-    AwayScore: int
-    HomeScore: int
+    AwayScore: Optional[int]
+    HomeScore: Optional[int]
 
 class GameByDate(BaseModel):
     GameID: int

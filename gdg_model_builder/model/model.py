@@ -423,7 +423,6 @@ class Model(Modellike):
             return
     
         d = e.__dict__.copy()
-        print("Emitting...", d)
         self.store.xadd(event_hash, d)
 
     def _task(self, e : type[Event] = None)->Callable[[EO], EO]:
@@ -549,7 +548,6 @@ class Model(Modellike):
         Args:
             event_hash (str): _description_
         """
-        print("Listenting on a task...")
         try: 
             self.store.xgroup_create(event_hash, self.model_hostname, mkstream=True)
         except Exception as e:
@@ -584,11 +582,9 @@ class Model(Modellike):
         
         event_hash  = self.get_relative_event_hash(Init)
         init_key = self.get_init_key()
-        print("Init key...", init_key, event_hash)
 
         try: 
             self.store.xgroup_create(event_hash, self.model_hostname, mkstream=True)
-            print("Successfully added group...")
         except Exception as e:
             print(e)
         
@@ -599,14 +595,11 @@ class Model(Modellike):
         
         while not self.store.exists(init_key):
             time.sleep(1)
-            print("Checking init...")
             for resp in self.store.xreadgroup(self.model_hostname, self.consumer_id, {
                 event_hash : '>'
             }, count=10, block=1000):
                 _, messages = resp
-                print("received response...")
                 for id, message in messages:
-                    print(message)
                     if nonce in [key.decode('utf-8') for key in message.keys()]:
                         # we want to ignore nonces
                         continue
@@ -624,7 +617,6 @@ class Model(Modellike):
         Init.model_hostname = self.model_hostname
         event_hash  = self.get_relative_event_hash(Init)
         init_key = self.get_init_key()
-        print("Init key...", init_key, event_hash)
         # hello next
     
         # make sure there's at least one event handler
@@ -634,7 +626,6 @@ class Model(Modellike):
                 return
         
         async def emit_init():
-            print("Emitting init...")
             self.emit(Init(init=init_key))
             return True
         
