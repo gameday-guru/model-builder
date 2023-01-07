@@ -2,8 +2,10 @@ from typing import Optional, Protocol, Sequence
 
 from pydantic import BaseModel
 import requests
-from dotenv import dotenv_values
+from dotenv import load_dotenv
+import os
 
+load_dotenv()
 
 class Stadiumlike(BaseModel):
     StadiumID: int
@@ -78,13 +80,13 @@ def get_teams()->Sequence[Teamlike]:
     Returns:
         Sequence[Teamlike]: gets info about all teams
     """
-    domain = dotenv_values()["SPORTS_DATA_DOMAIN"]
+    domain = os.getenv("SPORTS_DATA_DOMAIN")
     return [
         Team.parse_obj(team)
         for team in requests.get(
         f"{domain}/v3/cbb/scores/json/teams",
         params={
-            "key" : dotenv_values()["SPORTS_DATA_KEY"]
+            "key" : os.getenv("SPORTS_DATA_KEY")
         }
     ).json()]
 

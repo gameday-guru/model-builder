@@ -10,6 +10,12 @@ class FriendlyEvent(Event):
     
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
+        
+class Args(BaseModel): 
+    a : int
+    
+class Returns(BaseModel):
+    b : str
 
 # create a model
 my_model = Model(cron_window=1)
@@ -17,9 +23,9 @@ my_model = Model(cron_window=1)
 class Thing(BaseModel):
     first : str
 
-@my_model.method()
-async def hello_world():
-    return "Hello, world!"
+@my_model.method(a=Args, r=Returns)
+async def hello_world(a : Args):
+    return  Returns(b="Hello world")
 
 @my_model.get("whose_world", universal, private, t=str)
 async def whose_world_global(context, val):
@@ -38,7 +44,7 @@ async def get_thing(context, val):
 async def set_whose_world_user(context, val):
     return val
 
-@my_model.task(valid=dow(5))
+@my_model.task(valid=dow(6))
 async def say_hello(event = None):
     """Says hello
 
@@ -52,17 +58,16 @@ async def say_hello(event = None):
 async def what(event = None):
     print("Initializing...")
 
-@my_model.task(valid=days(1))
+@my_model.task(valid=secs(5))
 async def huzzah_hello(event = None):
     """Says huzzah
 
     Args:
         event (_type_, optional): _description_. Defaults to None.
     """
-    print("Retrodating!...")
+    print("Retrodating!...", datetime.fromtimestamp(event.ts))
 
 if __name__ == "__main__":
-    my_model.retrodate = datetime.strptime("2022 11 18", "%Y %m %d").timestamp()
     # my_model.model_hostname = uuid.uuid1().bytes
     # my_model.model_hostname = "hello"
     # test

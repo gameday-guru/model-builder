@@ -2,9 +2,12 @@ from datetime import datetime
 from typing import Any, Callable, Dict, List, Protocol, TypeVar, cast, Optional
 
 import requests
-from dotenv import dotenv_values
+from dotenv import load_dotenv
 from pydantic import BaseModel
 from json import dumps
+import os
+
+load_dotenv()
 
 class TeamSeasonStatslike(BaseModel):
     StatID : int
@@ -123,11 +126,11 @@ def get_team_season_stats_by_date(date : datetime) -> List[TeamSeasonStats]:
     Returns:
         List[TeamGameStatsByDatelike]: are the games by date.
     """
-    domain = dotenv_values()["SPORTS_DATA_DOMAIN"]
+    domain = os.getenv("SPORTS_DATA_DOMAIN")
     json = requests.get(
         f"{domain}/v3/cbb/scores/json/TeamSeasonStats/{date.year}",
         params={
-            "key" : dotenv_values()["SPORTS_DATA_KEY"]
+            "key" : os.getenv("SPORTS_DATA_KEY")
         }
     ).json()
     return [TeamSeasonStats.parse_obj(obj) for obj in json]

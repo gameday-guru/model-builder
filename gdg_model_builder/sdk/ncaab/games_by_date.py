@@ -3,8 +3,11 @@ from typing import Any, Callable, Dict, List, Protocol, TypeVar, cast, Optional
 from .team import Stadiumlike
 
 import requests
-from dotenv import dotenv_values
+from dotenv import load_dotenv
 from pydantic import BaseModel
+import os
+
+load_dotenv()
 
 
 class Periodlike(BaseModel):
@@ -110,8 +113,8 @@ class GameByDate(BaseModel):
     AwayTeamPreviousGlobalGameID: Optional[int]
     HomeTeamPreviousGloablGameID: Optional[int]
     TournamentDisplayOrder: Optional[int]
-    TournamentDisplayOrderForHomeTeam: str
-    IsClosed: bool
+    TournamentDisplayOrderForHomeTeam: Optional[str]
+    IsClosed: Optional[bool]
     GameEndDateTime: Optional[datetime]
     HomeRotationNumber: Optional[int]
     AwayRotationNumber: Optional[int]
@@ -137,11 +140,11 @@ def get_games(date : datetime) -> List[GameByDatelike]:
     Returns:
         List[GameByDatelike]: are the games by date.
     """
-    domain = dotenv_values()["SPORTS_DATA_DOMAIN"]
+    domain = os.getenv("SPORTS_DATA_DOMAIN")
     json = requests.get(
         f"{domain}/v3/cbb/scores/json/GamesByDate/{date.year}-{date.month}-{date.day}",
         params={
-            "key" : dotenv_values()["SPORTS_DATA_KEY"]
+            "key" : os.getenv("SPORTS_DATA_KEY")
         }
     ).json()
     return [GameByDate.parse_obj(g) for g in json]

@@ -10,6 +10,7 @@ import uuid
 from typing import Any, Awaitable, Callable, Dict, List, Optional, Protocol, Sequence, TypeVar
 from hashlib import sha256
 from json import dumps
+from dotenv import load_dotenv
 
 import cattrs
 from checksumdir import dirhash
@@ -17,6 +18,7 @@ import redis
 import uvicorn
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from gdg_model_builder.context.bounds.bounds import Bound
@@ -28,6 +30,13 @@ from gdg_model_builder.event.event import Event, exclusive, iproxy, pproxy
 from gdg_model_builder.modifiers.state import private
 import os
 
+load_dotenv()
+
+REDIS_HOST=os.getenv("REDIS_HOST") or "localhost"
+REDIS_PORT=os.getenv("REDIS_PORT") or  6379
+
+print("REDIS ON: ", REDIS_HOST, REDIS_PORT)
+
 P = TypeVar("P")
 R = TypeVar("R")
 RR = TypeVar("RR", bound=BaseModel)
@@ -38,18 +47,18 @@ CO = Callable[[Context, R], Awaitable[R]]
 
 EO = Callable[[Event, Context], Awaitable[R]]
 
-LA = Callable[[int, Optional[int]], int]
+LA = Callable[[float, Optional[float]], float]
 
 def init(now : int, last : Optional[int]):
     if last is None:
         return 1
     return -1
 
-def poll(now : int, last : int):
-    return int(time.time())
+def poll(now : float, last : float):
+    return float(time.time())
 
 def secs(count : int)->LA:
-    def _secs(now : int, last : int):
+    def _secs(now : float, last : float):
         if last is None or (now - last)/1000 > count:
             return now
         return -1
@@ -57,7 +66,7 @@ def secs(count : int)->LA:
     return _secs
 
 def mins(count : int)->LA:
-    def _mins(now : int, last : int):
+    def _mins(now : float, last : float):
         if last is None or (now - last)/(1000 * 60) > count:
             return now
         return -1
@@ -65,7 +74,7 @@ def mins(count : int)->LA:
     return _mins
 
 def hours(count : int)->LA:
-    def _hours(now : int, last : int):
+    def _hours(now : float, last : float):
         if last is None or (now - last)/(1000 * 60 * 60) > count:
             return now
         return -1
@@ -73,7 +82,7 @@ def hours(count : int)->LA:
     return _hours
 
 def days(count : int)->LA:
-    def _days(now : int, last : int):
+    def _days(now : float, last : float):
         if last is None or (now - last)/(1000 * 60 * 60 * 24) > count:
             return now
         return -1
@@ -81,7 +90,7 @@ def days(count : int)->LA:
     return _days
 
 def months(count : int)->LA:
-    def _months(now : int, last : int):
+    def _months(now : float, last : float):
         dt_now = datetime.fromtimestamp(now/1000)
         dt_last = datetime.fromtimestamp(last/1000)
         if last is None or (dt_now.month - dt_last.month) > count:
@@ -91,7 +100,7 @@ def months(count : int)->LA:
     return _months
 
 def dow(which : int)->LA:
-    def _dow(now : int, last : int):
+    def _dow(now : float, last : float):
         dt_now = datetime.fromtimestamp(now/1000)
         now_epoch_days = now/(1000 * 60 * 60 * 24)
         last_epoch_days = now/(1000 * 60 * 60 * 24)
@@ -102,7 +111,7 @@ def dow(which : int)->LA:
     return _dow
 
 def date_once(*, which : str, format : str)->LA:
-    def _date_once(now : int, last : int):
+    def _date_once(now : float, last : float):
         date_str = datetime.strftime(which, format)
         now_epoch_days = now/(1000 * 60 * 60 * 24)
         now_str = datetime.fromtimestamp(now/1000).strftime(format)
@@ -164,7 +173,7 @@ class Modellike(Protocol):
     async def sim(self):
         pass
     
-r = redis.Redis(host='localhost', port=6379, db=0)
+r = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=0)
 
 class PrivateMethodException(Exception):
     pass
@@ -204,17 +213,31 @@ class Model(Modellike):
     cron_window : int
     
     converter = cattrs.Converter()
+    
+    history : bool = False
 
 
-    def __init__(self, /, *, store : redis.Redis = r, cron_window : int = 15) -> None:
+    def __init__(self, /, *, 
+            store : redis.Redis = r, 
+            cron_window : int = 15,
+            history : bool = False
+    ) -> None:
         super().__init__()
         self.app = FastAPI()
+        self.app.add_middleware(
+            CORSMiddleware,
+            allow_origins=["*"],
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
         self.store = store
         self.consumer_id = uuid.uuid1().hex
         self.cron_window = cron_window
+        self.history = history
 
 
-    def method(self)->Callable[[AC], AC]:
+    def method(self, a : type[R], r : type[R])->Callable[[AC], AC]:
         """Binds a method to the model.
 
         Args:
@@ -224,9 +247,10 @@ class Model(Modellike):
             AC: _description_
         """
         def decorator(func : AC):
-            @self.app.post(func.__name__)
-            async def inner(*args, **kwargs):
-                return func(*args, **kwargs)
+            
+            @self.app.post(f"/method/{func.__name__}")
+            async def inner(arg : a)->r:
+                return await func(arg)
             return func
         return decorator
 
@@ -247,8 +271,12 @@ class Model(Modellike):
         def decorator(func : CO):
 
             async def inner(context : Context, *args):
-                obj = Model.parse_raw(self.store.lrange(get_min_key(bounds=args, key=self.get_inner_key(key), context=context), 0, 0)[0])
-                return await func(context, obj.data)
+                if self.history: 
+                    obj = Model.parse_raw(self.store.lrange(get_min_key(bounds=args, key=self.get_inner_key(key), context=context), 0, 0)[0])
+                    return await func(context, obj.data)
+                else:
+                    obj = Model.parse_raw(self.store.get(get_min_key(bounds=args, key=self.get_inner_key(key), context=context)))
+                    return await func(context, obj.data)
             
             # register inner with get_methods map
             for arg in args:
@@ -294,6 +322,7 @@ class Model(Modellike):
     def get_inner_key(self, key : str):
         return f"{self.model_hostname}:{key}" 
 
+
     def set(self, key : str, *args, t : type[R])->Callable[[CO[R]], CO[R]]:
         """Binds a set method to the model.
 
@@ -312,8 +341,13 @@ class Model(Modellike):
         def decorator(func : CO):
             async def inner(context : Context, value : R):
                 val : R = await func(context, value)
-                self.store.lpush(get_min_key(bounds=args, key=self.get_inner_key(key), context=context), Model(data=val).json())
-                return Model.parse_raw(self.store.lrange(get_min_key(bounds=args, key=self.get_inner_key(key), context=context), 0, 0)[0])
+                
+                if self.history:
+                    self.store.lpush(get_min_key(bounds=args, key=self.get_inner_key(key), context=context), Model(data=val).json())
+                    return Model.parse_raw(self.store.lrange(get_min_key(bounds=args, key=self.get_inner_key(key), context=context), 0, 0)[0])
+                else:
+                    self.store.set(get_min_key(bounds=args, key=self.get_inner_key(key), context=context), Model(data=val).json())
+                    return Model.parse_raw(self.store.get(get_min_key(bounds=args, key=self.get_inner_key(key), context=context)))
             
             # register inner with get_methods map
             for arg in args:
@@ -527,9 +561,10 @@ class Model(Modellike):
         Args:
             event_hash (str): _description_
         """
-        for resp in self.store.xreadgroup(self.model_hostname, self.consumer_id, {
-            event_hash : '>'
-        }, count=10, block=100):
+        
+        streams = dict()
+        streams[event_hash] = '>'
+        for resp in self.store.xreadgroup(self.model_hostname, self.consumer_id, streams, count=10, block=100):
             _, messages = resp
             
             for id, message in messages:
@@ -595,9 +630,9 @@ class Model(Modellike):
         
         while not self.store.exists(init_key):
             time.sleep(1)
-            for resp in self.store.xreadgroup(self.model_hostname, self.consumer_id, {
-                event_hash : '>'
-            }, count=10, block=1000):
+            streams = dict()
+            streams[event_hash] = '>'
+            for resp in self.store.xreadgroup(self.model_hostname, self.consumer_id, streams, count=10, block=1000):
                 _, messages = resp
                 for id, message in messages:
                     if nonce in [key.decode('utf-8') for key in message.keys()]:
