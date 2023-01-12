@@ -16,6 +16,18 @@ class Args(BaseModel):
     
 class Returns(BaseModel):
     b : str
+    
+class ProjectionEntry(BaseModel):
+    game_id : int
+    home_team_id : int
+    away_team_id : int
+    home_team_score : float
+    away_team_score : float
+    
+class ProjectionRequest(BaseModel):
+    away_team_id : str
+    home_team_id : str
+    neutral : bool
 
 # create a model
 my_model = Model(cron_window=1)
@@ -23,8 +35,8 @@ my_model = Model(cron_window=1)
 class Thing(BaseModel):
     first : str
 
-@my_model.method(a=Args, r=Returns)
-async def hello_world(a : Args):
+@my_model.method(a=ProjectionRequest, r=ProjectionEntry)
+async def hello_world(a : ProjectionRequest)->ProjectionEntry:
     return  Returns(b="Hello world")
 
 @my_model.get("whose_world", universal, private, t=str)
@@ -58,17 +70,14 @@ async def say_hello(event = None):
 async def what(event = None):
     print("Initializing...")
 
-@my_model.task(valid=secs(5))
+@my_model.task(valid=secs(20))
 async def huzzah_hello(event = None):
     """Says huzzah
 
     Args:
         event (_type_, optional): _description_. Defaults to None.
     """
-    print("Retrodating!...", datetime.fromtimestamp(event.ts))
+    print(datetime.fromtimestamp(int(event.ts)/1000))
 
 if __name__ == "__main__":
-    # my_model.model_hostname = uuid.uuid1().bytes
-    # my_model.model_hostname = "hello"
-    # test
     my_model.start()

@@ -29,17 +29,14 @@ from gdg_model_builder.context.user.user import User, Userlike
 from gdg_model_builder.event.event import Event, exclusive, iproxy, pproxy
 from gdg_model_builder.modifiers.state import private
 import os
+from gdg_model_builder.environment.environment import GDG_MODEL_HOSTNAME, GDG_REDIS_HOST, GDG_REDIS_PORT, GDG_BUMP_MODEL_START, bump_model_hostname
 
-load_dotenv()
-
-REDIS_HOST=os.getenv("REDIS_HOST") or "localhost"
-REDIS_PORT=os.getenv("REDIS_PORT") or  6379
-
-print("REDIS ON: ", REDIS_HOST, REDIS_PORT)
-
+##################
+### Type Vars ####
+##################
 P = TypeVar("P")
 R = TypeVar("R")
-RR = TypeVar("RR", bound=BaseModel)
+RR = TypeVar("RR", bound=BaseModel) # base model return
 
 AC = Callable[[P], Awaitable[R]]
 CG = Callable[[Context], Awaitable[R]]
@@ -49,11 +46,8 @@ EO = Callable[[Event, Context], Awaitable[R]]
 
 LA = Callable[[float, Optional[float]], float]
 
-def init(now : int, last : Optional[int]):
-    if last is None:
-        return 1
-    return -1
 
+# TODO: these need to be converted to tuple return types, one for the time of the event, one for the value used in cron serialization
 def poll(now : float, last : float):
     return float(time.time())
 
@@ -120,15 +114,20 @@ def date_once(*, which : str, format : str)->LA:
         return -1
     _date_once.__name__ = f"_months_{which}_{format}"
     return _date_once
-    
+
+# this is used to control stream starting and ignorance behavior
 nonce = 'gamedaygurunoncenonotuseforanythingbutwhatisrecommendedherein'
 
 class CronEvent(Event):
+    """A Cron Event is an event with a time stamp
+    """
     
     ts : float
     valid : LA
     
 class Init(Event):
+    """An Init event is an event that has init set to 1.
+    """
     
     init : int = 1
 
@@ -145,17 +144,17 @@ class Modellike(Protocol):
         pass
 
     def set(self, func : CO, key : str, *args,  value : R, t : type[R])->Callable[[CO[R]], CO[R]]:
-        """_summary_
+        """Decorates a setter, allowing it to perform state management
         """
         pass
 
     def task(self, func : EO, e : type[Event])->Callable[[EO], EO]:
-        """_summary_
+        """Decorates a task, allowing it to be included in the distributed task loop.
         """
         pass
 
     def emit(self, e : Event)->None:
-        """_summary_
+        """Emits an event.
         """
         pass
 
@@ -165,15 +164,21 @@ class Modellike(Protocol):
         pass
 
     def join_acl(self, *, key : str, user : Userlike)->str:
+        """Adds a user to an ACL.
+        """
         pass
 
     async def start(self):
+        """Starts the model
+        """
         pass
     
     async def sim(self):
+        """Simulates the model
+        """
         pass
     
-r = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=0)
+r = redis.Redis(host=GDG_REDIS_HOST, port=GDG_REDIS_PORT, db=0)
 
 class PrivateMethodException(Exception):
     pass
@@ -190,7 +195,7 @@ class Model(Modellike):
     retrodate : Optional[float] = None
     start_time : int = 0
     
-    model_hostname : str = "0"
+    model_hostname : str = GDG_MODEL_HOSTNAME
 
     app : FastAPI
     
@@ -220,9 +225,18 @@ class Model(Modellike):
     def __init__(self, /, *, 
             store : redis.Redis = r, 
             cron_window : int = 15,
-            history : bool = False
+            history : bool = False,
+            model_hostname : Optional[str] = None
     ) -> None:
         super().__init__()
+        
+        if model_hostname:
+            self.model_hostname = model_hostname
+        else:
+            # bump the model hostname if the environment requests it
+            # TODO: this currently does not work and it may be better to make it CLI logic anyways
+            bump_model_hostname()
+            
         self.app = FastAPI()
         self.app.add_middleware(
             CORSMiddleware,
@@ -238,13 +252,14 @@ class Model(Modellike):
 
 
     def method(self, a : type[R], r : type[R])->Callable[[AC], AC]:
-        """Binds a method to the model.
+        """_summary_
 
         Args:
-            func (AC): _description_
+            a (type[R]): _description_
+            r (type[R]): _description_
 
         Returns:
-            AC: _description_
+            Callable[[AC], AC]: _description_
         """
         def decorator(func : AC):
             
@@ -428,7 +443,9 @@ class Model(Modellike):
             UninitializedEventException: _description_
         """
         # intercept the emit based on exclusivity
+        print(e.model_hostname, self.model_hostname)
         if e.particul == exclusive and e.model_hostname != self.model_hostname:
+            print(e)
             raise ExclusiveEmitError(f"The event {e.__name__} is exclusive to {e.model_hostname}. You cannot emit it.")
         elif e.particul == iproxy and e.model_hostname != self.model_hostname:
             return
@@ -499,6 +516,7 @@ class Model(Modellike):
                 
                 # include in model
                 model_hostname: Optional[str] = self.model_hostname
+                __name__ = vfunc.__name__
                 
                 ts : float
                 valid: LA = vfunc
@@ -508,7 +526,8 @@ class Model(Modellike):
                     super().__init__()
                     self.ts = ts
                     
-            Cron.__name__ = vfunc.__name__
+            print(Cron.model_hostname)
+                    
             # add the cron class
             self.cron_events[self.get_relative_event_hash(Cron)] = Cron
             
@@ -660,10 +679,6 @@ class Model(Modellike):
             async def handle_init(e):
                 return
         
-        async def emit_init():
-            self.emit(Init(init=init_key))
-            return True
-        
         return await asyncio.gather(
             self._listen_init()
         )
@@ -679,7 +694,6 @@ class Model(Modellike):
         obj_hash = sha256()
         obj_hash.update(cls.__name__.encode('utf-8'))
         obj_hash.update(str(self.model_hostname).encode('utf-8'))
-        obj_hash.update(dirhash(os.getcwd()).encode('utf-8'))
         return obj_hash.digest().hex()
     
     def get_init_key(self):
