@@ -191,6 +191,8 @@ class ExclusiveEmitError(Exception):
 
 class Model(Modellike):
     
+    loop : asyncio.BaseEventLoop
+    
     timefactor : int = 1
     retrodate : Optional[float] = None
     start_time : int = 0
@@ -202,11 +204,13 @@ class Model(Modellike):
     store : redis.Redis
 
     event_handlers : Dict[str, List[tuple[type[Event], EO]]] = {}
+    handler_loops : Dict[str, asyncio.BaseEventLoop] = {}
     cron_events : Dict[str, type[CronEvent]] = {}
     cron_logs : Dict[str, int] = {}
 
     cron_pool = concurrent.futures.ThreadPoolExecutor()
     task_listener_pool = concurrent.futures.ThreadPoolExecutor()
+    handler_pool = concurrent.futures.ThreadPoolExecutor()
     server_pool = concurrent.futures.ThreadPoolExecutor()
     
     get_methods : Dict[Context, Dict[str, AC]] = {}
@@ -229,6 +233,7 @@ class Model(Modellike):
             model_hostname : Optional[str] = None
     ) -> None:
         super().__init__()
+        self.loop = asyncio.get_event_loop()
         
         if model_hostname:
             self.model_hostname = model_hostname
@@ -336,7 +341,12 @@ class Model(Modellike):
            
     def get_inner_key(self, key : str):
         return f"{self.model_hostname}:{key}" 
-
+    
+    def register_handler_ready(self, event_hash : str)->bool:
+        return self.store.set(f"ready:::{event_hash}", 1) 
+   
+    def handler_ready(self, event_hash : str)->bool:
+       return self.store.exists(f"ready:::{event_hash}") > 0 
 
     def set(self, key : str, *args, t : type[R])->Callable[[CO[R]], CO[R]]:
         """Binds a set method to the model.
@@ -443,7 +453,6 @@ class Model(Modellike):
             UninitializedEventException: _description_
         """
         # intercept the emit based on exclusivity
-        print(e.model_hostname, self.model_hostname)
         if e.particul == exclusive and e.model_hostname != self.model_hostname:
             print(e)
             raise ExclusiveEmitError(f"The event {e.__name__} is exclusive to {e.model_hostname}. You cannot emit it.")
@@ -459,7 +468,6 @@ class Model(Modellike):
         ):
             raise UninitializedEventException()
 
-    
         event_lock_addr = self.get_event_lock_addr(e)
 
         if e.nonce and self.store.exists(event_lock_addr):
@@ -526,8 +534,6 @@ class Model(Modellike):
                     super().__init__()
                     self.ts = ts
                     
-            print(Cron.model_hostname)
-                    
             # add the cron class
             self.cron_events[self.get_relative_event_hash(Cron)] = Cron
             
@@ -536,45 +542,60 @@ class Model(Modellike):
     def _run_cron(self, status : int):
          while True:
             time.sleep(self.cron_window) 
-            for key, event in self.cron_events.items():
-                now = self.start_time + int((time.time() - self.start_time) * self.timefactor * 1000)
-                method_now = event.valid(now, self.cron_logs.get(key))
-                if method_now > -1:
-                    cron_event = event(ts=method_now)
-                    self.emit(cron_event)   
-                    self.cron_logs[key] = method_now
+            frontier = set(self.cron_events.keys())
+            while len(frontier) > 0:
+                for key in [*frontier]:
+                    event = self.cron_events[key]
+                    now = self.start_time + int((time.time() - self.start_time) * self.timefactor * 1000)
+                    method_now = event.valid(now, self.cron_logs.get(key))
+                    if method_now > -1:
+                        cron_event = event(ts=method_now)
+                        self.emit(cron_event)   
+                        self.cron_logs[key] = method_now
+                    frontier.remove(key)
 
           
     def run_retrodate(self, start : float):
+        
+        print("Retrodating...")
         flag = True
         timiter = start
         while flag: 
             time.sleep(0) # we want this to cycle through as fast as possible, but yield the procesor
             # we need to make sure this runs not just up to the time at which the loop began
             # but up to the actual time when the loop would finish
-            for key, event in self.cron_events.items():
-                method_now = event.valid(timiter * 1000, self.cron_logs.get(key))
-                if method_now > -1:
-                    cron_event = event(ts=method_now)
-                    self.emit(cron_event)   
-                    self.cron_logs[key] = method_now
+            frontier = set(self.cron_events.keys())
+            while len(frontier) > 0:
+                for key in [*frontier]:
+                    event = self.cron_events[key]
+                    method_now = event.valid(timiter * 1000, self.cron_logs.get(key))
+                    if method_now > -1:
+                        cron_event = event(ts=method_now)
+                        ready = self.handler_ready(key)
+                        if not ready:
+                            continue
+                        self.emit(cron_event)   
+                        self.cron_logs[key] = method_now
+                    frontier.remove(key)
 
             if timiter > time.time():
                 flag = False
             timiter += 1
+        print("Finished retrodating.")
     
-    async def run_cron(self, loop : asyncio.BaseEventLoop):
+    async def run_cron(self):
         
         if self.retrodate is not None: # retrodate the cron loop if possible
-            self.run_retrodate(self.retrodate)
+            await self.loop.run_in_executor(self.cron_pool, self.run_retrodate, self.retrodate)
         
-        return await loop.run_in_executor(self.cron_pool, self._run_cron, 1)
+        return await self.loop.run_in_executor(self.cron_pool, self._run_cron, 1)
             
-    def handle_task(self, routine : EO, event : Event):
-        loop = asyncio.new_event_loop()
-        loop.run_until_complete(routine(event))
+    async def handle_task(self, routine : EO, event : Event, event_hash : str):
+        await self.handler_loops[event_hash].create_task(
+            routine(event)
+        )
         
-    def read_task_stream(self, event_hash : str):
+    async def read_task_stream(self, event_hash : str):
         """_summary_
 
         Args:
@@ -586,6 +607,7 @@ class Model(Modellike):
         for resp in self.store.xreadgroup(self.model_hostname, self.consumer_id, streams, count=10, block=100):
             _, messages = resp
             
+            tasks = []
             for id, message in messages:
                 if nonce in [key.decode('utf-8') for key in message.keys()]:
                     # we want to ignore nonces
@@ -594,14 +616,16 @@ class Model(Modellike):
                     d = {}
                     for key, value in message.items():
                         d[key.decode('utf-8')] = value.decode('utf-8')
-                    self.handle_task(routine, EventType(**d))
+                    tasks.append(self.handle_task(routine, EventType(**d), event_hash))
+            await asyncio.gather(*tasks)
 
-    def _listen_task(self, event_hash : str, loop : asyncio.BaseEventLoop):
+    def _listen_task(self, event_hash : str):
         """_summary_
 
         Args:
             event_hash (str): _description_
         """
+        self.handler_loops[event_hash] = asyncio.new_event_loop()
         try: 
             self.store.xgroup_create(event_hash, self.model_hostname, mkstream=True)
         except Exception as e:
@@ -610,27 +634,24 @@ class Model(Modellike):
             
         self.store.xgroup_createconsumer(event_hash, self.model_hostname, self.consumer_id)
         self.store.xadd(event_hash, {nonce : nonce})
+        self.register_handler_ready(event_hash)
         
         while True:
             time.sleep(0)
-            # may want to do some error handling here
-            # self.store.xautoclaim(event_hash, self.consumer_id, self.consumer_id, min_idle_time=0, count=10)
-            # claim the event for yourself
             try:
-                self.read_task_stream(event_hash)
+                self.handler_loops[event_hash].run_until_complete(self.read_task_stream(event_hash))
             except Exception as e:
                 logging.exception(e)
             
       
     
-    async def listen_task(self, event_hash : str, loop : asyncio.BaseEventLoop):
+    async def listen_task(self, event_hash : str):
         """Listens to a task.
 
         Args:
             event_hash (str): _description_
         """
-        loop.run_in_executor(self.task_listener_pool, self._listen_task, event_hash, loop)
-        return
+        await self.loop.run_in_executor(self.task_listener_pool, self._listen_task, event_hash)
     
     async def _listen_init(self):
         
@@ -678,10 +699,7 @@ class Model(Modellike):
             @self.task(e=Init)
             async def handle_init(e):
                 return
-        
-        return await asyncio.gather(
-            self._listen_init()
-        )
+        return await self._listen_init()
         
         
     def get_instance_hash(self):
@@ -704,14 +722,14 @@ class Model(Modellike):
         """
         return self.get_instance_hash()
     
-    async def listen_tasks(self, loop : asyncio.BaseEventLoop):
+    async def listen_tasks(self):
         """Listens for tasks
         """
-        
+
         await self.listen_init()
-        
+     
         return await asyncio.gather(*[
-            self.listen_task(id, loop)
+            self.listen_task(id)
             for id in self.event_handlers
         ])
     
@@ -721,25 +739,23 @@ class Model(Modellike):
         uvicorn.run(self.app)
      
             
-    async def run_server(self, loop : asyncio.BaseEventLoop):
+    async def run_server(self):
         """_summary_
         """
-        return await loop.run_in_executor(self.server_pool, self._run_server, 1)
+        return await self.loop.run_in_executor(self.server_pool, self._run_server, 1)
     
-    async def _start(self, loop : asyncio.BaseEventLoop = asyncio.get_event_loop()):
-        
-        # make sure you're listening to the tasks first
-        await self.listen_tasks(loop)
-        
+    async def _start(self):
+
         return await asyncio.gather(
-            self.run_cron(loop),
-            self.run_server(loop)
+            self.loop.create_task(self.listen_tasks()),
+            self.loop.create_task(self.run_cron()),
+            self.loop.create_task(self.run_server())
         )
 
 
-    def start(self, loop : asyncio.BaseEventLoop = asyncio.get_event_loop()):
+    def start(self):
         
-        loop.run_until_complete(self._start(loop))
+        self.loop.run_until_complete(self._start())
 
         
 

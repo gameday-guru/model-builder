@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "gdg-model-builder"
-version = "1.4.12"
+version = "1.4.14"
 description = ""
 authors = ["Liam Monninger <l.mak.monninger@gmail.com>"]
 license = "MIT"
@@ -14,6 +14,7 @@ redis = "^4.3.4"
 cattrs = "^22.1.0"
 pycron = "^3.0.0"
 checksumdir = "^1.2.0"
+polars = "^0.16.2"
 
 [tool.poetry.dev-dependencies]
 

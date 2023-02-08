@@ -70,14 +70,16 @@ async def say_hello(event = None):
 async def what(event = None):
     print("Initializing...")
 
-@my_model.task(valid=secs(20))
+@my_model.task(valid=secs(1))
 async def huzzah_hello(event = None):
     """Says huzzah
 
     Args:
         event (_type_, optional): _description_. Defaults to None.
     """
-    print(datetime.fromtimestamp(int(event.ts)/1000))
+    print("Hello", event.ts, datetime.fromtimestamp(float(event.ts)/1000))
 
 if __name__ == "__main__":
+    # my_model.retrodate = datetime.strptime("2023 1 20", "%Y %m %d").timestamp()
+    # my_model.model_hostname = "sample"
     my_model.start()
