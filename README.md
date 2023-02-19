@@ -251,7 +251,7 @@ avg = game_scores.frame.select("home").avg()
 ```
 
 ### Staging
-You can work with `Table` data in a safe staging environment referrd to as the draft. You modify read and write behavior as follows.
+You can work with `Table` data in a safe staging environment referred to as the draft. You modify read and write behavior as follows.
 
 ```python
 class ReadMode(Enum):
