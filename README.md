@@ -143,6 +143,13 @@ async def alert_new_member(e : MyWatchedEvent):
     await send_alert_using_naive_hash(e.eid)
 ```
 
+Maybe we could do something like this...
+```python
+@my_model.watch_task(e=MyWatchedEvent, watcher=get_names_from_db)
+async def watch_names():
+    await send_alert_using_naive_hash(e.eid)
+```
+
 In most cases, however, you will want to define the hashing behavior, or the manner in which the event is created.
 
 Using the `hash` kwarg, you will simply change the procedure for producing the `eid : bytes` value.
