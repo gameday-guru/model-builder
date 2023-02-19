@@ -227,6 +227,7 @@ You will often find it best to store state as a collection. For this purpose, we
 ### Table
 ```python
 class GameScore(BaseModel):
+    id : str
     home : int
     away : int
 
