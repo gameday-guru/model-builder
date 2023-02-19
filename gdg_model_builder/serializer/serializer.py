@@ -1,12 +1,35 @@
 import collections
+from enum import Enum
 from typing import Sequence, TypeVar, Generic, Dict, Tuple, Iterable, Optional
 
 K = TypeVar("K")
 V = TypeVar("V")
 
+class ReadMode(Enum):
+    READ_THROUGH = 0
+    READ_LATENT = 1
+    READ_CACHE = 2
+    READ_CACHE_ONLY = 3
+
+class WriteMode(Enum):
+    WRITE_THROUGH = 0
+    WRITE_CACHE = 1
+    
+class DeleteMode(Enum):
+    DELETE_THROUGH = 0
+    DELETE_CACHE = 1
+    
+class EnforcementMode(Enum):
+    AUTO = 0
+    SIGNED = 1
+
 class Serializer(collections.UserDict[K, V], Generic[K, V]):
     
-    def stage(self)->None:
+    def stage(self, /, *, 
+            read : Optional[ReadMode],
+            write : Optional[WriteMode],
+            delete : Optional[DeleteMode]
+        )->None:
         """Toggles stage mode.
         """
         pass
@@ -22,6 +45,15 @@ class Serializer(collections.UserDict[K, V], Generic[K, V]):
         pass
     
     def __getitem__(self, key : K)->Optional[V]:
+        pass
+    
+    def __setitem__(self, key : K, value : V):
+        pass
+    
+    def __delitem__(self, key : K):
+        pass
+    
+    def __contains__(self, key : K):
         pass
     
     def serialize(self, value : V)->bytes:

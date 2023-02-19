@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "gdg-model-builder"
-version = "1.4.14"
+version = "1.4.16"
 description = ""
 authors = ["Liam Monninger <l.mak.monninger@gmail.com>"]
 license = "MIT"

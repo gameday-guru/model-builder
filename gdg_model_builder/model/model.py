@@ -75,9 +75,10 @@ def hours(count : int)->LA:
     _hours.__name__ = f"_hours_{count}"
     return _hours
 
-def days(count : int)->LA:
+def days(count : int, at : int = 0)->LA:
     def _days(now : float, last : float):
-        if last is None or (now - last)/(1000 * 60 * 60 * 24) > count:
+        last_floor = int((last or 0)/(1000 * 60 * 60 * 24)) * (1000 * 60 * 60 * 24) + at
+        if last is None or (now - last_floor)/(1000 * 60 * 60 * 24) > count:
             return now
         return -1
     _days.__name__ = f"_days_{count}"
@@ -152,6 +153,11 @@ class Modellike(Protocol):
         """Decorates a task, allowing it to be included in the distributed task loop.
         """
         pass
+    
+    def watch(self, func : EO, e : type[Event])->Callable[[EO], EO]:
+        """Binds a retrieviable state to the model
+        """
+        pass
 
     def emit(self, e : Event)->None:
         """Emits an event.
@@ -219,7 +225,7 @@ class Model(Modellike):
     
     consumer_id : str
     
-    cron_window : int
+    cron_window : int = 1
     
     converter = cattrs.Converter()
     
@@ -580,7 +586,7 @@ class Model(Modellike):
 
             if timiter > time.time():
                 flag = False
-            timiter += 1
+            timiter += self.cron_window
         print("Finished retrodating.")
     
     async def run_cron(self):

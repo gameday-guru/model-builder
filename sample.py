@@ -4,6 +4,8 @@ from gdg_model_builder import Model, private, session, spiodirect, universal, In
 from pydantic import BaseModel
 import uuid
 
+UTC_PLUS_PST=1000*60*60*12 # 4 AM PST
+
 class FriendlyEvent(Event):
     note : str = "love"
     nonce : bool = False
@@ -70,7 +72,7 @@ async def say_hello(event = None):
 async def what(event = None):
     print("Initializing...")
 
-@my_model.task(valid=secs(1))
+@my_model.task(valid=days(1, at=UTC_PLUS_PST))
 async def huzzah_hello(event = None):
     """Says huzzah
 
@@ -80,6 +82,6 @@ async def huzzah_hello(event = None):
     print("Hello", event.ts, datetime.fromtimestamp(float(event.ts)/1000))
 
 if __name__ == "__main__":
-    # my_model.retrodate = datetime.strptime("2023 1 20", "%Y %m %d").timestamp()
+    my_model.retrodate = datetime.strptime("2023 1 20", "%Y %m %d").timestamp()
     # my_model.model_hostname = "sample"
     my_model.start()
