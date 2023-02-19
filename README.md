@@ -247,7 +247,7 @@ game_scores["1"] = GameScore(
 
 They also colocate a dataframe at the `.frame` member. This dataframe is derived from `polars`.
 ```python
-avg = game_scores.df.select("home").avg()
+avg = game_scores.frame.select("home").avg()
 ```
 
 ### Staging
