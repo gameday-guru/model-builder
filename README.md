@@ -143,6 +143,13 @@ async def alert_new_member(e : MyWatchedEvent):
     await send_alert_using_naive_hash(e.eid)
 ```
 
+Maybe we could do something like this...
+```python
+@my_model.watch_task(e=MyWatchedEvent, watcher=get_names_from_db)
+async def watch_names():
+    await send_alert_using_naive_hash(e.eid)
+```
+
 In most cases, however, you will want to define the hashing behavior, or the manner in which the event is created.
 
 Using the `hash` kwarg, you will simply change the procedure for producing the `eid : bytes` value.
@@ -220,6 +227,7 @@ You will often find it best to store state as a collection. For this purpose, we
 ### Table
 ```python
 class GameScore(BaseModel):
+    id : str
     home : int
     away : int
 
@@ -239,11 +247,11 @@ game_scores["1"] = GameScore(
 
 They also colocate a dataframe at the `.frame` member. This dataframe is derived from `polars`.
 ```python
-avg = game_scores.df.select("home").avg()
+avg = game_scores.frame.select("home").avg()
 ```
 
 ### Staging
-You can work with `Table` data in a safe staging environment referrd to as the draft. You modify read and write behavior as follows.
+You can work with `Table` data in a safe staging environment referred to as the draft. You modify read and write behavior as follows.
 
 ```python
 class ReadMode(Enum):
