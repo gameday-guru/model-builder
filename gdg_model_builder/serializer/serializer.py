@@ -19,9 +19,10 @@ class DeleteMode(Enum):
     DELETE_THROUGH = 0
     DELETE_CACHE = 1
     
-class EnforcementMode(Enum):
+class SaveMode(Enum):
     AUTO = 0
     SIGNED = 1
+    MANUAL = 2
 
 class Serializer(collections.UserDict[K, V], Generic[K, V]):
     

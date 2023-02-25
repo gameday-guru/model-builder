@@ -1,6 +1,6 @@
 from datetime import datetime
 import json
-from gdg_model_builder import Model, private, session, spiodirect, universal, Init, poll, secs, dow, days, Event
+from gdg_model_builder import Model, private, session, spiodirect, universal, Init, poll, secs, dow, days, Event, Table
 from pydantic import BaseModel
 import uuid
 
@@ -36,6 +36,11 @@ my_model = Model(cron_window=1)
 
 class Thing(BaseModel):
     first : str
+
+
+@my_model.watch_task(Event=FriendlyEvent, watcher=lambda a : [])
+async def handle_new_data(event : FriendlyEvent):
+    pass
 
 @my_model.method(a=ProjectionRequest, r=ProjectionEntry)
 async def hello_world(a : ProjectionRequest)->ProjectionEntry:
