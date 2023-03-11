@@ -37,29 +37,27 @@ my_model = Model(cron_window=1)
 class Thing(BaseModel):
     first : str
 
-
+"""
 @my_model.watch_task(Event=FriendlyEvent, watcher=lambda a : [])
 async def handle_new_data(event : FriendlyEvent):
     pass
+"""
 
-@my_model.method(a=ProjectionRequest, r=ProjectionEntry)
-async def hello_world(a : ProjectionRequest)->ProjectionEntry:
-    return  Returns(b="Hello world")
 
-@my_model.get("whose_world", universal, private, t=str)
+@my_model.get("whose_world", universal, private, Struct=str)
 async def whose_world_global(context, val):
     return "everyone's world"
 
-@my_model.get("whose_house", session, t=str)
+@my_model.get("whose_house", session, Struct=str)
 async def get_whose_world_user(context, val):
     thing = await get_thing(context)
     return val
 
-@my_model.get("thing", session, t=Thing)
+@my_model.get("thing", session, Struct=str)
 async def get_thing(context, val):
     return val
 
-@my_model.set("whose_house", session, t=str)
+@my_model.set("whose_house", session, Struct=str)
 async def set_whose_world_user(context, val):
     return val
 
@@ -73,12 +71,12 @@ async def say_hello(event = None):
     print("Hello")
 
 
-@my_model.task(e=Init)
-async def what(event = None):
+@my_model.task(Event=Init)
+async def what(event):
     print("Initializing...")
 
 @my_model.task(valid=days(1, at=UTC_PLUS_PST))
-async def huzzah_hello(event = None):
+async def huzzah_hello(event):
     """Says huzzah
 
     Args:

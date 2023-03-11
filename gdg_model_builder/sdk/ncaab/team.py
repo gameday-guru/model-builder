@@ -4,6 +4,7 @@ from pydantic import BaseModel
 import requests
 from dotenv import load_dotenv
 import os
+from ...util.lru.lru import lru_cache_time
 
 load_dotenv()
 
@@ -73,7 +74,7 @@ class Team(BaseModel):
     ShortDisplayName: str
     Stadium: Optional[Stadiumlike]
 
-
+lru_cache_time(60, 32)
 def get_teams()->Sequence[Teamlike]:
     """Gets all teams
 

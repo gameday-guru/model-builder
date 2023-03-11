@@ -1,6 +1,6 @@
 import collections
 from typing import Sequence, TypeVar, Generic
-from .serializer import Serializer
+from ..serializer import Serializer
 
 K = TypeVar("K")
 V = TypeVar("V")

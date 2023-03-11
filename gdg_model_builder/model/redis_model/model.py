@@ -57,6 +57,7 @@ class Model(Modellike):
     handler_loops : Dict[str, asyncio.BaseEventLoop] = {}
     cron_events : Dict[str, type[CronEvent]] = {}
     cron_logs : Dict[str, int] = {}
+    cron_queue : List[int] = []
 
     cron_pool = concurrent.futures.ThreadPoolExecutor()
     task_listener_pool = concurrent.futures.ThreadPoolExecutor()
@@ -76,9 +77,10 @@ class Model(Modellike):
     history : bool = False
 
 
+
     def __init__(self, /, *, 
             store : redis.Redis = r, 
-            cron_window : int = 15,
+            cron_window : int = 1,
             history : bool = False,
             model_hostname : Optional[str] = None
     ) -> None:
@@ -232,8 +234,9 @@ class Model(Modellike):
     
         dictionary = event.__dict__.copy()
         self.store.xadd(event_hash, dictionary)
+    
         
-    def task(self, Event, valid):
+    def task(self, *args, Event = None, valid = None):
         
         if Event is not None:
             return self._task(Event)
@@ -430,6 +433,9 @@ class Model(Modellike):
                     frontier.remove(key)
 
           
+    def retrodate_emit(self, *, event=CronEvent):
+        pass
+          
     def run_retrodate(self, start : float):
         
         flag = True
@@ -569,7 +575,7 @@ class Model(Modellike):
     
         # make sure there's at least one event handler
         if Init.get_event_hash() not in self.event_handlers:
-            @self.task(e=Init)
+            @self.task(Event=Init)
             async def handle_init(e):
                 return
         return await self._listen_init()

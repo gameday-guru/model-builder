@@ -1,6 +1,7 @@
 from datetime import datetime
 from typing import Any, Callable, Dict, List, Protocol, TypeVar, cast, Optional
 from .team import Stadiumlike
+from ...util.lru.lru import lru_cache_time
 
 import requests
 from dotenv import load_dotenv
@@ -130,6 +131,25 @@ class GameByDate(BaseModel):
     Stadium: Optional[Stadiumlike]
     Periods: List[Periodlike]
 
+@lru_cache_time(60, 32)
+def _get_games(*, day : int, month : int, year : int) -> List[GameByDatelike]:
+    """Gets games by date directly from sportsdataio
+
+    Args:
+        date (datetime): is the date in question.
+
+    Returns:
+        List[GameByDatelike]: are the games by date.
+    """
+    print("READ THROUGH")
+    domain = os.getenv("SPORTS_DATA_DOMAIN")
+    json = requests.get(
+        f"{domain}/v3/cbb/scores/json/GamesByDate/{year}-{month}-{day}",
+        params={
+            "key" : os.getenv("SPORTS_DATA_KEY")
+        }
+    ).json()
+    return [GameByDate.parse_obj(g) for g in json]
 
 def get_games(date : datetime) -> List[GameByDatelike]:
     """Gets games by date directly from sportsdataio
@@ -140,11 +160,4 @@ def get_games(date : datetime) -> List[GameByDatelike]:
     Returns:
         List[GameByDatelike]: are the games by date.
     """
-    domain = os.getenv("SPORTS_DATA_DOMAIN")
-    json = requests.get(
-        f"{domain}/v3/cbb/scores/json/GamesByDate/{date.year}-{date.month}-{date.day}",
-        params={
-            "key" : os.getenv("SPORTS_DATA_KEY")
-        }
-    ).json()
-    return [GameByDate.parse_obj(g) for g in json]
+    return _get_games(day=date.day, month=date.month, year=date.year)

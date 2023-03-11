@@ -7,20 +7,20 @@ import collections
 K = TypeVar("K")
 # V = TypeVar("V")
 
-R = TypeVar("R", BaseModel)
+R = TypeVar("R", bound=BaseModel)
 
 class Table(collections.UserDict[K, R], Generic[K, R]):
     
-    mapping : Serializer
-    frame : polars.DataFrame[R]
+    serializer : Serializer
+    frame : polars.DataFrame
     
-    def __init__(self, *, mapping : Optional[Serializer]) -> None:
+    def __init__(self, *, mapping : Optional[Serializer] = None) -> None:
         """_summary_
 
         Args:
             mapping (Serializer): _description_
         """
-        self.mapping = mapping
+        self.mapping = mapping or Serializer()
         self.frame = polars.DataFrame(mapping)
         
 class Thing(BaseModel):
@@ -29,7 +29,3 @@ class Thing(BaseModel):
         
 class ThingTable(Table[str, Thing]):
     pass
-
-tbl = ThingTable()
-
-col2 = tbl.frame[1, ["data"]]

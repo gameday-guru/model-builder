@@ -73,7 +73,7 @@ class Modellike(Protocol):
         """
         pass
 
-    def task(self, *args, Event : Optional[type[EventVar]], valid : Optional[LA])\
+    def task(self, *args, Event : Optional[type[EventVar]] = None, valid : Optional[LA] = None)\
         ->Callable[
             [Callable[[EventVar, Context], Awaitable[R]]], 
             Callable[[EventVar, Context], Awaitable[R]]
@@ -89,7 +89,7 @@ class Modellike(Protocol):
         ]:
         """Binds a retrieviable state to the model
         """
-        pass
+        raise NotImplementedError("watch has not been implemented for this model class.")
 
     def watch_task(self, *args, Event : type[EventVar], watcher=Optional[AsyncWatcherGenerator])\
         ->Callable[
@@ -99,7 +99,7 @@ class Modellike(Protocol):
         """
         Watches for new entries in an iterator and runs the task when there are new entries
         """
-        pass
+        raise NotImplementedError("watch_task has not been implemented for this model class.")
 
     def emit(self, event : Event)->None:
         """Emits an event.

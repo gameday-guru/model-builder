@@ -1,5 +1,6 @@
 from datetime import datetime
 from typing import Any, Callable, Dict, List, Protocol, TypeVar, cast, Optional
+from ...util.lru.lru import lru_cache_time
 
 import requests
 from dotenv import load_dotenv
@@ -117,7 +118,8 @@ class TeamSeasonStats(BaseModel):
     FantasyPointsDraftKings :  Optional[float]
     FantasyPointsYahoo :  Optional[float]
 
-def get_team_season_stats_by_date(date : datetime) -> List[TeamSeasonStats]:
+lru_cache_time(60, 32)
+def _get_team_season_stats_by_date(*, year : int) -> List[TeamSeasonStats]:
     """Gets games by date directly from sportsdataio
 
     Args:
@@ -128,9 +130,13 @@ def get_team_season_stats_by_date(date : datetime) -> List[TeamSeasonStats]:
     """
     domain = os.getenv("SPORTS_DATA_DOMAIN")
     json = requests.get(
-        f"{domain}/v3/cbb/scores/json/TeamSeasonStats/{date.year}",
+        f"{domain}/v3/cbb/scores/json/TeamSeasonStats/{year}",
         params={
             "key" : os.getenv("SPORTS_DATA_KEY")
         }
     ).json()
     return [TeamSeasonStats.parse_obj(obj) for obj in json]
+
+def get_team_season_stats_by_date(date : datetime) -> List[TeamSeasonStats]:
+    
+    return _get_team_season_stats_by_date(year=date.year)

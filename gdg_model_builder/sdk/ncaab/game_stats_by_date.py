@@ -1,5 +1,6 @@
 from datetime import datetime
 from typing import Any, Callable, Dict, List, Protocol, TypeVar, cast, Optional
+from ...util.lru.lru import lru_cache_time
 
 import requests
 from dotenv import load_dotenv
@@ -134,7 +135,21 @@ class TeamGameStatsByDate(BaseModel):
     FantasyPointsFanDuel : Optional[float]
     FantasyPointsDraftKings : Optional[float]
     FantasyPointsYahoo : Optional[float]
+   
+lru_cache_time(300, 32) 
+def _get_game_stats_by_date(*, day : int, month : int, year : int)-> List[TeamGameStatsByDatelike]:
+    
 
+    print("READ THROUGH")
+    
+    domain = os.getenv("SPORTS_DATA_DOMAIN")
+    json = requests.get(
+        f"{domain}/v3/cbb/scores/json/TeamGameStatsByDate/{year}-{month}-{day}",
+        params={
+            "key" : os.getenv("SPORTS_DATA_KEY")
+        }
+    ).json()
+    return [TeamGameStatsByDate.parse_obj(entry) for entry in json]
 
 def get_game_stats_by_date(date : datetime) -> List[TeamGameStatsByDatelike]:
     """Gets games by date directly from sportsdataio
@@ -145,11 +160,4 @@ def get_game_stats_by_date(date : datetime) -> List[TeamGameStatsByDatelike]:
     Returns:
         List[TeamGameStatsByDatelike]: are the games by date.
     """
-    domain = os.getenv("SPORTS_DATA_DOMAIN")
-    json = requests.get(
-        f"{domain}/v3/cbb/scores/json/TeamGameStatsByDate/{date.year}-{date.month}-{date.day}",
-        params={
-            "key" : os.getenv("SPORTS_DATA_KEY")
-        }
-    ).json()
-    return [TeamGameStatsByDate.parse_obj(entry) for entry in json]
+    return _get_game_stats_by_date(day=date.day, month=date.month, year=date.year)

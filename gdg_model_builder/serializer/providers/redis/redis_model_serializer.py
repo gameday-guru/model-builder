@@ -1,4 +1,4 @@
-from .model_serializer import ModelSerializer
+from ...model_serializer.model_serializer import ModelSerializer
 from typing import Sequence, TypeVar, Generic, Tuple, Iterable, Mapping
 import redis
 
