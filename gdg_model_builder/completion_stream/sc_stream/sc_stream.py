@@ -1,52 +1,72 @@
 from ..completion_stream import CompletionStream, V
 from gdg_model_builder.serializer.serializer import Serializer, WriteMode, ReadMode
-from typing import Optional, Generic, List
+from typing import Optional, Generic, List, Dict, MutableSet, TypeVar, Mapping, Sequence
+from gdg_model_builder.lock.lock import Lock
+from time import sleep
 
-class SerializerStream(CompletionStream, Generic[V]):
+T = TypeVar("T")
+
+class SerializerStream(CompletionStream[V], Generic[V, T]):
     
-    curr : Serializer[int, V]
-    complete : Serializer[V, int]
-    queue : List[V]
-    num_times : int
+    event_lock : Lock[V]
     
-    def is_complete(self) -> bool:
-        return self.complete[self.curr[0]] > 0
+    cycle_queue : List[T] # min heap    
+    cycle_sets : Mapping[T, Serializer[V, float]]
+    queue_lock : Lock[int]
     
-    def syn(self):
+    read_set : MutableSet[V]    
+    times : Mapping[V, MutableSet[T]]
+    ready_queue : List[V]
+    
+    def send(self, *, event: V, cycle : T):
         
-        self.complete.stage(
-            read=ReadMode.READ_THROUGH,
-            write=WriteMode.WRITE_THROUGH
-        )
+        if self.event_lock.test(event):
+            self.cycle_queue.append(cycle)
+            self.cycle_sets[cycle][event][-1.0]
         
-        self.curr.stage(
-            read=ReadMode.READ_THROUGH,
-            write=WriteMode.WRITE_THROUGH
-        )
+    def is_ready(self, *, event : V):
         
-        status = self.complete[self.curr[0]]
-        if status is not None:
-            return
-        # TODO: we'll want to check if we care about race condition here later
-        self.complete[self.curr[0]] = 0
-        self.complete.commit()
+        t0 = self.cycle_queue[0]
+        if not event in self.cycle_sets[self.cycle_queue[0]]:
+            return False
         
-    def fin(self):
+        self.times[event].add(t0)
+        return True
+    
+    def syn(self, *, event : V):
         
-        self.complete.stage(
-            read=ReadMode.READ_THROUGH,
-            write=WriteMode.WRITE_THROUGH
-        )
+        self.set_progress(event, 0.0)
         
-        self.curr.stage(
-            read=ReadMode.READ_THROUGH,
-            write=WriteMode.WRITE_THROUGH
-        )
+    def set_progress(self, *, event : V, pct : float):
         
-        status = self.complete[self.curr[0]]
-        if status is None:
-            return
-        # TODO: we'll want to check if we care about race condition here later
-        self.complete[self.curr[0]] = status + 1 
+        for time in self.times[event]:
+            self.cycle_sets[time][event] = pct
+        
+    def fin(self, event : V):
+        
+        for time in self.times[event]:
+            
+            del self.cycle_sets[time][event]
+            
+            while len(self.cycle_queue[time]) > 0:
+                sleep(0)
+            
+            if time == self.cycle_queue[0] and self.queue_lock.test(0):
+                self.cycle_queue.pop(0)
+                
+            self.times[event].remove(time)
+        
+    def __next__(self) -> Optional[V]:
+        
+        for event in self.read_set:
+            if self.is_ready(event):
+                self.ready_queue(event)
+        
+        if len(self.ready_queue > 0):
+            return self.ready_queue.pop(0)
+        
+        return None
+        
+        
 
     

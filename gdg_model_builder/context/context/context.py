@@ -1,6 +1,7 @@
 from typing import Any, Dict, Protocol, Sequence
 from time import time
 import uuid
+from datetime import datetime
 
 from attrs import frozen
 
@@ -21,6 +22,8 @@ class Contextlike(Protocol):
     key : str
     
     target : Bound
+    
+    date : datetime
 
 class ContextkeyException(Exception):
     pass
@@ -38,6 +41,8 @@ class Context(Contextlike):
     
     target : Bound
     
+    date : datetime
+    
 root = Context(
     key = "root",
     target=universal,
@@ -51,7 +56,8 @@ root = Context(
     ),
     execution=Execution(
         id=uuid.uuid1().hex
-    )
+    ),
+    date=datetime.now()
 )
     
 def get_bounds_keys(context : Contextlike, key : str = None) -> Dict[Bound, str]:

@@ -1,24 +1,23 @@
 from typing import Protocol, TypeVar, Generic, Optional, Iterable, Iterator
 
 V = TypeVar("V")
+T = TypeVar("T")
 
 class CompletionStream(Iterator[Optional[V]], Protocol, Generic[V]):
-
-    def is_complete(self)->bool:
+    
+    
+    def send(self, *, event : V):
         pass
     
-    def next(self)->Optional[V]:
+    def syn(self, *, event : V):
         pass
     
-    def syn(self):
+    def set_progress(self, *, event : V, pct : float):
         pass
     
-    def fin(self):
+    def fin(self, *, event : V):
         pass
     
     def __next__(self) -> Optional[V]:
         
-        if not self.is_complete():
-            return None
-        
-        return self.next()
+        pass
