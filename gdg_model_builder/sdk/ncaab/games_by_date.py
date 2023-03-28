@@ -141,7 +141,6 @@ def _get_games(*, day : int, month : int, year : int) -> List[GameByDatelike]:
     Returns:
         List[GameByDatelike]: are the games by date.
     """
-    print("READ THROUGH")
     domain = os.getenv("SPORTS_DATA_DOMAIN")
     json = requests.get(
         f"{domain}/v3/cbb/scores/json/GamesByDate/{year}-{month}-{day}",

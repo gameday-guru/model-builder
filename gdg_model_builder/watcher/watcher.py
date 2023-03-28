@@ -3,4 +3,6 @@ from enum import Enum
 from typing import Sequence, TypeVar, Generic, Dict, Tuple, Iterable, Optional
 
 class Watcher():
-    pass
+    
+    def watch(self):
+        pass
