@@ -3,7 +3,7 @@ import requests
 from dotenv import load_dotenv
 from pydantic import BaseModel
 import os
-from ...util.lru.lru import lru_cache_time
+from gdg_model_builder.util.lru.lru import lru_cache_time
 from datetime import datetime
 load_dotenv()
 

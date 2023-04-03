@@ -1,14 +1,14 @@
-from ..serializer import Serializer
+from gdg_model_builder.serializer import Serializer
 from typing import TypeVar, Generic, AsyncIterator, Tuple
 from pydantic import BaseModel
-import collections
 import pandas as pd
 from dask import dataframe
+from ...struct import Struct
 
 K = TypeVar("K")
 # V = TypeVar("V")
 
-R = TypeVar("R", bound=BaseModel)
+R = TypeVar("R", bound=Struct)
 
 class DataFrame(pd.DataFrame, Generic[K, R]):
     
@@ -50,7 +50,7 @@ class DaskDataFrame(DataFrame, dataframe.DataFrame):
             yield [index, row.to_dict()]
 
 
-class Table(Serializer[K, R], Generic[K, R]):
+class Table(Struct, Serializer[K, R], Generic[K, R]):
     
     @property
     def frame(self)->DataFrame:
@@ -60,13 +60,8 @@ class Table(Serializer[K, R], Generic[K, R]):
     def df(self, df : DataFrame):
         pass
     
-class DaskRedisTable(Serializer[K, R], Generic[K, R]):
-    pass
-    
-        
-class Thing(BaseModel):
-    
-    data : str
-        
-class ThingTable(Table[str, Thing]):
-    pass
+    def __hash__(self) -> int:
+        return sum([
+            hash(val)
+            for val in self.values()
+        ])

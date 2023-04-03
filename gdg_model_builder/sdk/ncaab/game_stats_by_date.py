@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Any, Callable, Dict, List, Protocol, TypeVar, cast, Optional
-from ...util.lru.lru import lru_cache_time
+from gdg_model_builder.util.lru.lru import lru_cache_time
 
 import requests
 from dotenv import load_dotenv

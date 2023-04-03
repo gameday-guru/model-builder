@@ -1,3 +1,6 @@
 from .lineups_by_date import get_lineups
 from .get_games_by_date import get_games_by_date
 from .get_games_with_lineups_by_date import get_games_with_lineups_by_date, get_game_with_lineups_by_date
+from .weather_at_ballpark import get_weather_at_ballpark
+from .get_stadium import get_stadium
+from .get_games_with_weather_by_date import get_games_with_weather_by_date

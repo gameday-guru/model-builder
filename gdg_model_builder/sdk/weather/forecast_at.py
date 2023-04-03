@@ -1,7 +1,7 @@
 from typing import List, Optional
 
 from pydantic import BaseModel, Field
-from ...util.lru.lru import lru_cache_time
+from gdg_model_builder.util.lru.lru import lru_cache_time
 
 import requests
 from dotenv import load_dotenv
