@@ -57,10 +57,10 @@ class Serializer(collections.UserDict[K, V], Generic[K, V]):
     def __contains__(self, key : K):
         pass
     
-    def serialize(self, value : V)->bytes:
+    def serialize_element(self, value : V)->bytes:
         pass
     
-    def deserialize(self, value : bytes)->V:
+    def deserialize_element(self, value : bytes)->V:
         pass
     
     def hash(self, key : K)->bytes:
@@ -110,10 +110,10 @@ class Serializer(collections.UserDict[K, V], Generic[K, V]):
         pass
     
     def size(self)->int:
-        """Gets a deterministic sequence of keys.
+        """Gets the size of the serializer collection.
 
         Returns:
-            Sequence[K]: a sequence of keys.
+            int: _description_
         """
         pass
     

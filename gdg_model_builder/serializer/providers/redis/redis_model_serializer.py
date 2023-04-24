@@ -8,7 +8,7 @@ V = TypeVar("V")
 class RedisModelSerializer(ModelSerializer[K, V],  Generic[K, V]):
     
     store : redis.Redis
-    buffer : int = 32
+    buffer : int = 4096
     encoding : str = "utf-8"
     
     def __init__(self, *args, store : redis.Redis, model_name : str, state_name : str, **kwargs) -> None:
@@ -33,7 +33,7 @@ class RedisModelSerializer(ModelSerializer[K, V],  Generic[K, V]):
         serialized = self.store.get(self.model_hash(key))
         if serialized is None:
             return None
-        return self.deserialize(serialized)
+        return self.deserialize_element(serialized)
 
     def __setitem__(self, key, value):
         """_summary_
@@ -47,7 +47,7 @@ class RedisModelSerializer(ModelSerializer[K, V],  Generic[K, V]):
         entry_key = self.model_hash(key)
         
         self.store.zadd(model_state_key, { entry_key : 0})
-        self.store.set(entry_key, self.serialize(value))
+        self.store.set(entry_key, self.serialize_element(value))
         
 
     def __delitem__(self, key):
@@ -142,7 +142,6 @@ class RedisModelSerializer(ModelSerializer[K, V],  Generic[K, V]):
         
         # empty the buffer one last time
         if len(buffer) > 0:
-            print(buffer)
             self.store.zrem(model_state_key, *buffer) 
             self.store.delete(*buffer) 
         
