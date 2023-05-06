@@ -332,6 +332,14 @@ optional = false
 python-versions = ">=3.7"
 
 [[package]]
+name = "mmh3"
+version = "3.1.0"
+description = "Python wrapper for MurmurHash (MurmurHash3), a set of fast and robust hash functions."
+category = "main"
+optional = false
+python-versions = "*"
+
+[[package]]
 name = "numpy"
 version = "1.23.4"
 description = "NumPy is the fundamental package for array computing with Python."
@@ -392,6 +400,19 @@ toolz = "*"
 
 [package.extras]
 complete = ["numpy (>=1.9.0)", "pandas (>=0.19.0)", "pyzmq", "blosc"]
+
+[[package]]
+name = "pottery"
+version = "3.0.0"
+description = "Redis for Humans."
+category = "main"
+optional = false
+python-versions = ">=3.7, <4"
+
+[package.dependencies]
+mmh3 = "*"
+redis = ">=4,<5"
+typing-extensions = "*"
 
 [[package]]
 name = "pycron"
@@ -657,7 +678,7 @@ testing = ["pytest (>=6)", "pytest-checkdocs (>=2.4)", "flake8 (<5)", "pytest-co
 [metadata]
 lock-version = "1.1"
 python-versions = ">3.9,<4.0"
-content-hash = "3b3a51b5cfb9935e51b01dce8a0019e7efd24613c371018e6a32161634de0f65"
+content-hash = "56198ab5c3fb2aacb6f8e53365d93363855644999e6820cdcbaf28a7696f28cd"
 
 [metadata.files]
 anyio = []
@@ -686,11 +707,13 @@ itsdangerous = []
 jinja2 = []
 locket = []
 markupsafe = []
+mmh3 = []
 numpy = []
 orjson = []
 packaging = []
 pandas = []
 partd = []
+pottery = []
 pycron = []
 pydantic = []
 pyparsing = []

@@ -16,6 +16,7 @@ pycron = "^3.0.0"
 checksumdir = "^1.2.0"
 pandas = "^1.5.3"
 dask = "^2023.3.2"
+pottery = "^3.0.0"
 
 [tool.poetry.dev-dependencies]
 
