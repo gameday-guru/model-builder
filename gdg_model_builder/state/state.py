@@ -1,6 +1,7 @@
 from typing import TypeVar, Generic
+from gdg_model_builder.shape.shape import Shape
 
-S = TypeVar("S")
+S = TypeVar("S", bound=Shape)
 
 class State(Generic[S]):
     

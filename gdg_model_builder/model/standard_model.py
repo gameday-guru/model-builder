@@ -4,19 +4,36 @@ from gdg_model_builder.model.model import Watcher
 from gdg_model_builder.state import State
 from .model import Model, E, S, Task, M
 from gdg_model_builder.schedule.redis_schedule import RedisSchedule
+from gdg_model_builder.schedule.redis_multiplexed_schedule import RedisMultiplexedSchedule
 from gdg_model_builder.clock.retro_clock import RetroClock
 from fastapi import FastAPI
+from gdg_model_builder.state.redis_state import RedisState
 
 class StandardModel(Model):
     
-    schedule : RedisSchedule
+    id : str
+    schedule : RedisMultiplexedSchedule
     clock : RetroClock
     app : FastAPI
     
-    async def state(self, name: str, Shape: type[S]) -> State[S]:
+    def qualify_state_name(self, name : str, Shape : type[S])->str:
+        return f"{self.id}.{Shape.identify().decode()}:{name}"
+        
+    
+    def state(self, name: str, Shape: type[S]) -> State[S]:
         
         # TODO: use FastAPI + Redis state here
-        return super().state(name, Shape)
+        qname = self.qualify_state_name(name, Shape)
+        this_state = RedisState[Shape](
+            name=name,
+            Shape=Shape
+        )
+        
+        @self.app.get(f"state/{qname}")
+        async def get_state()->Shape:
+            return await this_state.get()
+            
+        return this_state
     
     async def emit(self, shape: E, *, force : bool = False) -> None:
         await self.schedule.emit(shape, force=force)
@@ -35,13 +52,13 @@ class StandardModel(Model):
         # Use Redis Log mean watcher here
         return super().watch(Shape, Event)
     
-    async def period(self, predicate: Predicate, Event : E) -> None:
+    async def period(self, predicate: Predicate, Event : type[E]) -> None:
         
         async def handler(now : int):
             event = Event()
             event.overwrite_ts(now)
             # set the timestamp to the event
-            self.schedule.emit(event)
+            await self.schedule.emit(event)
             
         self.clock.add_task(
             predicate=predicate,

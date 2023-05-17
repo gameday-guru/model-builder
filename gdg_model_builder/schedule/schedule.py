@@ -5,17 +5,17 @@ S = TypeVar("S", bound=Shape)
 
 class Schedule(Protocol, Generic[S]):
     
-    async def emit(self, *, shape : Shape, force : bool = False)->bool:
+    async def emit(self, *, shape : S, force : bool = False)->bool:
         pass
     
-    async def add_handler(self, handler : Callable[[S], Awaitable[None]], shape : type[S]):
+    async def add_handler(self, handler : Callable[[S], Awaitable[None]]):
         pass
     
-    async def remove_handler(self, handler : Callable[[S], Awaitable[None]], shape : type[S]):
+    async def remove_handler(self, handler : Callable[[S], Awaitable[None]]):
         pass
     
     async def done(self, shape : S):
         pass
     
-    async def listen(self):
+    async def tick(self):
         pass

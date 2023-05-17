@@ -6,7 +6,7 @@ from typing_extensions import Self
 from typing import ClassVar
 
 class PydanticShape(BaseModel, Shape):
-    _ts: float = PrivateAttr()
+    _ts: int = PrivateAttr()
     _encoding: str = "UTF-8" # this should be included in the hash actually
     # because the encodings must be equivalent for logically equivalent objects
     # to be equivalent
@@ -17,7 +17,7 @@ class PydanticShape(BaseModel, Shape):
         
     def __init__(self, **kwargs):
         BaseModel.__init__(self, **kwargs)
-        self._ts = datetime.datetime.now().timestamp()
+        self._ts = int(datetime.datetime.now().timestamp() * 1000)
 
     def serialize(self) -> bytes:
         return bytes(json.dumps(self.dict()), encoding=self._encoding)
@@ -32,7 +32,10 @@ class PydanticShape(BaseModel, Shape):
 
     def hash(self) -> bytes:
         return bytes(json.dumps(self.dict()), encoding=self._encoding)
+    
+    def overwrite_ts(self, now: int) -> None:
+        self._ts = now
 
-    def get_ts(self) -> float:
+    def get_ts(self) -> int:
         return self._ts
 

@@ -9,9 +9,9 @@ class WeakrefSchedule(Schedule, Generic[S]):
     def __init__(self) -> None:
         super().__init__()
         self.cbs = WeakSet()
-        
-    async def add_handler(self, handler : Callable[[S], Awaitable[None]], shape : type[S]):
-        pass
     
-    async def remove_handler(self, handler : Callable[[S], Awaitable[None]], shape : type[S]):
-        pass
+    async def add_handler(self, handler: Callable[[S], Awaitable[None]]):
+        self.cbs.add(handler)
+    
+    async def remove_handler(self, handler: Callable[[S], Awaitable[None]]):
+        self.cbs.remove(handler)

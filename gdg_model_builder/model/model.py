@@ -51,10 +51,10 @@ class Model(Protocol):
         """
         pass
 
-    async def start(self):
+    def run(self):
         """Starts the model
         """
         pass
 
-    async def period(self, predicate : Predicate, Event : E)->None:
+    async def period(self, predicate : Predicate, Event : type[E])->None:
         pass
