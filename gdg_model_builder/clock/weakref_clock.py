@@ -24,7 +24,6 @@ class WeakrefClock(Clock):
             self.tasks[predicate] = WeakSet()
   
         self.tasks[predicate].add(task)
-        print(list(self.tasks.keys()))
 
     def remove_task(
         self,

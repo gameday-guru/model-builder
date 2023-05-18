@@ -58,3 +58,6 @@ class Model(Protocol):
 
     async def period(self, predicate : Predicate, Event : type[E])->None:
         pass
+    
+    def now(self)->int:
+        pass

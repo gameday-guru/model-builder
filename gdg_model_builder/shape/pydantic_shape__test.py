@@ -1,6 +1,7 @@
 import unittest
 from gdg_model_builder.util.deasync import deasync
 from .pydantic_shape import PydanticShape
+from time import sleep
 
 class TestRedisSchedule(unittest.TestCase):
 
@@ -11,6 +12,8 @@ class TestRedisSchedule(unittest.TestCase):
            away : int
            
         score = Score(home=1, away=2)
+        
+        sleep(1)
     
         another_score = Score(home=1, away=2)
         
@@ -32,6 +35,11 @@ class TestRedisSchedule(unittest.TestCase):
         self.assertEqual(
             Score.identify(),
             b'Score'
+        )
+        
+        self.assertEqual(
+            score,
+            Score.from_dict(**score.dict())
         )
         
         

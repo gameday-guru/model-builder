@@ -135,7 +135,6 @@ class TestRedisSchedule(unittest.TestCase):
             nonlocal second_count
             nonlocal third_count
             nonlocal fourth_count
-            print("Hello", args[0])
             if args[0] == "first_Hello":
                 first_count += 1
             elif args[0] == "second_World":
@@ -206,7 +205,6 @@ class TestRedisSchedule(unittest.TestCase):
             nonlocal second_count
             nonlocal third_count
             nonlocal fourth_count
-            print("Hello", args[0])
             if args[0] == "first_Hello":
                 first_count += 1
             elif args[0] == "second_World":
@@ -270,7 +268,6 @@ class TestRedisSchedule(unittest.TestCase):
             nonlocal second_count
             nonlocal third_count
             nonlocal fourth_count
-            print("Hello", args[0])
             if args[0].startswith("first_Hello"):
                 first_count += 1
             elif args[0].startswith("second_World"):

@@ -44,7 +44,6 @@ class TestRedisSchedule(unittest.TestCase):
             nonlocal third_a_count
             nonlocal fourth_a_count
             
-            print(shape.a)
             if shape.a.startswith("first_Hello"):
                 first_count += 1
                 first_a_count +=1 
@@ -62,7 +61,6 @@ class TestRedisSchedule(unittest.TestCase):
         b_last_count = 0     
         async def handle_b_shape(shape : B):
             
-            print(shape)
             nonlocal b_first_count
             nonlocal b_last_count
             

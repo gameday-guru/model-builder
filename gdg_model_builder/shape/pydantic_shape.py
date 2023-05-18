@@ -14,6 +14,10 @@ class PydanticShape(BaseModel, Shape):
     class Config:
         allow_population_by_field_name = True
         extra = Extra.ignore
+    
+    @classmethod
+    def from_dict(cls, **kwargs):
+        return cls(**kwargs)
         
     def __init__(self, **kwargs):
         BaseModel.__init__(self, **kwargs)
@@ -38,4 +42,5 @@ class PydanticShape(BaseModel, Shape):
 
     def get_ts(self) -> int:
         return self._ts
+
 

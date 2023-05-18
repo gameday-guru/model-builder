@@ -14,7 +14,6 @@ class TestRedisSchedule(unittest.TestCase):
         async def say_hello(now : int):
             nonlocal count
             count += 1
-            print("Hello")
             
         interval = secs(2) # for weakref
         clock.add_task(

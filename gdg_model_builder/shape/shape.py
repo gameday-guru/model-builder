@@ -8,7 +8,7 @@ class Shape: # shape can't be a protocol because this causes metaclass conflicts
     
     @classmethod
     def identify(cls)->bytes:
-        pass
+        return bytes(f"{cls.__name__}", encoding="utf-8")
     
     @classmethod
     def deserialize(cls, serial : bytes)->Self:
@@ -21,4 +21,8 @@ class Shape: # shape can't be a protocol because this causes metaclass conflicts
         pass
     
     def get_ts(self)->int:
+        pass
+    
+    @classmethod
+    def from_dict(cls, **kwargs)->Self:
         pass

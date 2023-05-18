@@ -8,6 +8,11 @@ from gdg_model_builder.schedule.redis_multiplexed_schedule import RedisMultiplex
 from gdg_model_builder.clock.retro_clock import RetroClock
 from fastapi import FastAPI
 from gdg_model_builder.state.redis_state import RedisState
+import uvicorn
+import asyncio
+import nest_asyncio
+nest_asyncio.apply()
+from gdg_model_builder.collection.collection import Collection, CollectionData
 
 class StandardModel(Model):
     
@@ -16,22 +21,47 @@ class StandardModel(Model):
     clock : RetroClock
     app : FastAPI
     
+    def __init__(self) -> None:
+        super().__init__()
+        self.id = "test" # TODO: handle env id
+        self.schedule = RedisMultiplexedSchedule()
+        self.clock = RetroClock()
+        self.app = FastAPI()
+    
     def qualify_state_name(self, name : str, Shape : type[S])->str:
-        return f"{self.id}.{Shape.identify().decode()}:{name}"
+        return f"{self.id}.{Shape.identify().decode()}/{name}"
         
     
     def state(self, name: str, Shape: type[S]) -> State[S]:
         
-        # TODO: use FastAPI + Redis state here
         qname = self.qualify_state_name(name, Shape)
         this_state = RedisState[Shape](
-            name=name,
-            Shape=Shape
+            name=qname,
+            typ=Shape
         )
         
-        @self.app.get(f"state/{qname}")
-        async def get_state()->Shape:
-            return await this_state.get()
+        if issubclass(Shape, Collection):
+            Sh : type[Collection] = Shape
+            
+            collection : Collection = Sh(name=qname)
+            asyncio.run(this_state.set(collection))
+            
+            @self.app.post(f"/state/{qname}/{{id}}") 
+            async def get_state(id : str)->Sh.shape:
+                return collection[id]
+            
+            @self.app.post(f"/state/{qname}")
+            async def get_state()->CollectionData:
+                return CollectionData(
+                    name=collection.name,
+                    size=collection.size
+                )
+            
+        else:
+            
+            @self.app.post(f"/state/{qname}")
+            async def get_state()->Shape:
+                return await this_state.get()
             
         return this_state
     
@@ -73,5 +103,22 @@ class StandardModel(Model):
     async def run_clock(self):
         
         while True:
+            await asyncio.sleep(.5) # TODO: add latency
             await self.clock.tick()
-                
+            
+    async def run_server(self):
+        uvicorn.run(self.app)
+            
+    async def _run(self):
+        await asyncio.gather(
+            self.run_clock(),
+            self.run_server()
+        )
+        
+    def now(self) -> int:
+        return self.clock.now()
+        
+    def run(self):
+        asyncio.get_event_loop().run_until_complete(
+            self._run()
+        )     
