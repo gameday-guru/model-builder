@@ -93,8 +93,6 @@ async def poll_scores_bufferized()->List[IdScore]:
 async def handle_new_score(event : IdScore)->None:
     print("A new score was added!", event.id, event.home, event.away)
 
-    
-
 if __name__ == "__main__":
     asyncio.run(add_one())
     asyncio.run(add_one_alternative())
