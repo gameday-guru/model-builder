@@ -1,7 +1,7 @@
 from gdg_model_builder.watcher.watcher import Observer, Translator, S, E
 from .watcher import Watcher
 from gdg_model_builder.shape import Shape
-from typing import Protocol, Generic, TypeVar, Callable, Awaitable
+from typing import Protocol, Generic, TypeVar, Callable, Awaitable, Tuple
 from asyncio import sleep
 from asyncio.locks import Lock
 import datetime
@@ -52,7 +52,7 @@ class RedisWatcher(Watcher[S, E], Generic[S, E]):
         await self.lock.acquire()
         diff = t - self.last_time
         
-        print(self.mean_time, self.sleep, diff)
+        # print(self.mean_time, self.sleep, diff)
         
         # we found another new value
         self.finds += 1
@@ -80,13 +80,13 @@ class RedisWatcher(Watcher[S, E], Generic[S, E]):
         
         self.lock.release()
     
-    async def tick(self) -> bool:
-        res = await super().tick()
-        if res:
+    async def tick(self, *, force : bool = False) -> Tuple[bool, S]:
+        success, result = await super().tick(force=force)
+        if success:
             await self.pos_wait()
         else:
             await self.neg_wait()
-        return res
+        return (success, result)
     
     async def is_new(self, shape: S) -> bool:
         exists = self.store.sismember(

@@ -1,18 +1,18 @@
-from typing import Callable, Awaitable
+from typing import Callable, Awaitable, Dict, Set
 from weakref import WeakKeyDictionary, WeakSet
 import asyncio
 from .clock import Clock, Predicate, Task
 
 
 class WeakrefClock(Clock):
-    tasks: WeakKeyDictionary[
+    tasks: Dict[
         Callable[[int], Awaitable[int]],
-        WeakSet[Callable[[int], Awaitable[None]]]
+        Set[Callable[[int], Awaitable[None]]]
     ]
 
     def __init__(self) -> None:
         super().__init__()
-        self.tasks = WeakKeyDictionary()
+        self.tasks = {}
 
     def add_task(
         self,
@@ -20,8 +20,9 @@ class WeakrefClock(Clock):
         predicate: Predicate,
         task: Task
     ):
+        
         if predicate not in self.tasks:
-            self.tasks[predicate] = WeakSet()
+            self.tasks[predicate] = set()
   
         self.tasks[predicate].add(task)
 

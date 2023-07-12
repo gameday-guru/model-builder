@@ -1,6 +1,6 @@
 import asyncio
 from gdg_model_builder.shape import Shape
-from typing import Protocol, Generic, TypeVar, Callable, Awaitable
+from typing import Protocol, Generic, TypeVar, Callable, Awaitable, Tuple
 import datetime
 
 S = TypeVar("S", bound=Shape)
@@ -41,13 +41,13 @@ class Watcher(Generic[S, E]):
         tasks = [handler(event) for handler in self.handlers]
         await asyncio.gather(*tasks)
 
-    async def tick(self) -> bool:
+    async def tick(self, *, force : bool = False) -> Tuple[bool, S]:
         result = await self.observer()
-        if not await self.is_new(result):
-            return False
+        if not force and not await self.is_new(result):
+            return (False, result)
         event = await self.translator(result)
         await self.handle_event(event)
-        return True
+        return (True, result)
     
     def now(self)->int:
         return int(datetime.datetime.now().timestamp() * 1000)

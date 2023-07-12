@@ -1,7 +1,8 @@
 from typing import Protocol
 from typing_extensions import Self
+from gdg_model_builder.util import Symbol
 
-class Shape: # shape can't be a protocol because this causes metaclass conflicts
+class Shape(Symbol): # shape can't be a protocol because this causes metaclass conflicts
     
     def serialize(self)->bytes:
         pass

@@ -3,17 +3,17 @@ from datetime import datetime
 from .clock import Predicate
 
 
-# TODO: these need to be converted to tuple return types, one for the time of the event, one for the value used in cron serialization
 async def poll(now : int):
     return int(time.time() * 1000)
 
-def increment_factory(*, size_ns : int, name : int):
-    last = None
+def increment_factory(*, size_ms : int, name : int):
     def _inner(count : int)->Predicate:
+        last = None
+        size = count * size_ms
         async def _incr(now : int):
             nonlocal last
-            now = int(now/size_ns) * (size_ns)
-            if last is None or (now - last)/(1000 * 1000) > size_ns:
+            now = int(now/size) * size # get the closest full increment
+            if last is None or (now - last) > size:
                 last = now
                 return now
             return -1
@@ -21,17 +21,17 @@ def increment_factory(*, size_ns : int, name : int):
         return _incr
     return _inner
 
-secs = increment_factory(size_ns=1000*1000, name="secs")
-mins = increment_factory(size_ns=1000*1000*60, name="mins")
-hours = increment_factory(size_ns=1000*1000*60*60, name="hours")
-days = increment_factory(size_ns=1000*1000*1000*60*60*24, name="days")
+secs = increment_factory(size_ms=1000, name="secs")
+mins = increment_factory(size_ms=1000*60, name="mins")
+hours = increment_factory(size_ms=1000*60*60, name="hours")
+days = increment_factory(size_ms=1000*60*60*24, name="days")
 
 def months(count : int)->Predicate:
     last = None
     async def _months(now : float):
         nonlocal last
-        dt_now = datetime.fromtimestamp(now/(1000 * 1000))
-        dt_last = datetime.fromtimestamp(now/(1000 * 1000))
+        dt_now = datetime.fromtimestamp(now/(1000))
+        dt_last = datetime.fromtimestamp(now/(1000))
         if last is None or (dt_now.month - dt_last.month) > count:
             return now
         return -1
@@ -42,7 +42,7 @@ def dow(which : int)->Predicate:
     last = None
     async def _dow(now : float):
         nonlocal last
-        dt_now = datetime.fromtimestamp(now/(1000 * 1000))
+        dt_now = datetime.fromtimestamp(now/(1000))
         now_epoch_days = now/(1000 * 60 * 60 * 24)
         last_epoch_days = now/(1000 * 60 * 60 * 24)
         if dt_now.toordinal() % 7 == which and (last is None or now_epoch_days != last_epoch_days):

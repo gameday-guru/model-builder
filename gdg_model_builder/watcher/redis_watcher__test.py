@@ -69,7 +69,7 @@ class TestRedisWatcher(unittest.TestCase):
         self.assertEqual(obs_count, 20)
         self.assertEqual(trans_count, 5)
         
-        print(watcher.mean_time)
+        # print(watcher.mean_time)
         
     @deasync
     async def test_redis_watcher_scattered(self):
@@ -99,4 +99,4 @@ class TestRedisWatcher(unittest.TestCase):
         self.assertEqual(obs_count, 20)
         self.assertLessEqual(trans_count, 20)
         
-        print(watcher.mean_time)
+        # print(watcher.mean_time)

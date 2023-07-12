@@ -3,12 +3,13 @@ from typing import Any, Awaitable, Callable, Dict, List, Optional, Protocol, Seq
 from gdg_model_builder.state import State
 from gdg_model_builder.shape import Shape
 from gdg_model_builder.clock import Predicate
+from gdg_model_builder.watcher import Observer
 
 A = TypeVar("A", bound=Shape)
 R = TypeVar("R", bound=Shape)
 Method = Callable[[A], Awaitable[R]]
 Task = Callable[[A], Awaitable[None]]
-Watcher = Callable[[], Awaitable[A]]
+# Watcher = Callable[[], Awaitable[A]]
 M = TypeVar("M", bound=Method)
 T = TypeVar("T", bound=Task)
 S = TypeVar("S", bound=Shape)
@@ -37,16 +38,16 @@ class Model(Protocol):
         """
         pass
     
-    def watch(self, Shape : type[S], Event : type[E])\
+    def watch(self, Shape : Optional[type[S]], Event : Optional[type[E]])\
         ->Callable[
-            [Watcher[S]], 
-            Watcher[S]
+            [Observer[S]], 
+            Observer[S]
         ]:
         """Binds a retrieviable state to the model
         """
         raise NotImplementedError("watch has not been implemented for this model class.")
 
-    def emit(self, shape : E, *, force : bool = False)->None:
+    async def emit(self, shape : E, *, force : bool = False)->None:
         """Emits an event.
         """
         pass
@@ -56,7 +57,7 @@ class Model(Protocol):
         """
         pass
 
-    async def period(self, predicate : Predicate, Event : type[E])->None:
+    def period(self, predicate : Predicate, Event : type[E])->None:
         pass
     
     def now(self)->int:
