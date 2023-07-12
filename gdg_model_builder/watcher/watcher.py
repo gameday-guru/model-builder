@@ -44,12 +44,15 @@ class Watcher(Generic[S, E]):
     async def tick(self) -> bool:
         result = await self.observer()
         if not await self.is_new(result):
-            return True
+            return False
         event = await self.translator(result)
         await self.handle_event(event)
-        return False
+        return True
     
     def now(self)->int:
         return int(datetime.datetime.now().timestamp() * 1000)
+    
+    async def clean(self):
+        pass
         
         

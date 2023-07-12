@@ -20,8 +20,6 @@ class RedisState(State[S], Generic[S]):
         key = self._get_state_key()  # Get the key for the state
         value = self.store.get(key)
         
-        print("GOT VALUE...", value)
-        
         if value is None:
             return None
         

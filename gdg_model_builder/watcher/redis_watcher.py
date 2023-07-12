@@ -15,20 +15,24 @@ class RedisWatcher(Watcher[S, E], Generic[S, E]):
     last_time : int
     sleep : float
     lock : Lock
-    base : int
     store : redis.Redis
+    power : float
     
     def __init__(self, *, 
                  store : redis.Redis = redis.Redis(),
                  shape: type, event: type, observer: Callable[[], Awaitable], translator: Callable[[], Awaitable], id: str = "root") -> None:
         super().__init__(shape=shape, event=event, observer=observer, translator=translator, id=id)
-        self.mean_time = 1
+        self.mean_time = 1000
+        self.power = 2/3
+        self._update_sleep()
         self.finds = 0
         self.last_time = self.now()
-        self.sleep = 1
         self.lock = Lock()
-        self.base = 2
         self.store = store
+        
+    def _update_sleep(self):
+        power_product = self.mean_time ** self.power
+        self.sleep = power_product * math.log2(self.mean_time) - power_product
         
     def _get_state_hash(self)->str:
         return f"{self.shape.identify()}:{self.id}"    
@@ -48,25 +52,27 @@ class RedisWatcher(Watcher[S, E], Generic[S, E]):
         await self.lock.acquire()
         diff = t - self.last_time
         
+        print(self.mean_time, self.sleep, diff)
+        
         # we found another new value
         self.finds += 1
         
         # our mean time is now a weighted average
         # between the time it took for our most recent find
         # and the reset of our mean time
-        self.mean_time = (
+        self.mean_time = int((
             self.mean_time *
             ((self.finds - 1)/self.finds)
         ) + (
             diff *
             ((1/self.finds))
-        )
+        ))
         
         # update the last time to this time
         self.last_time = t
         
         # update the sleep to a log of the mean time
-        self.sleep = math.log(self.mean_time, self.base)
+        self._update_sleep()
         # NOTE: given the above, you should be setting
         # your log base relatively low,
         # otherwise, you fill find yourself
@@ -87,10 +93,14 @@ class RedisWatcher(Watcher[S, E], Generic[S, E]):
             self._get_state_hash(),
             shape.hash()
         )
-        if not exists:
+        if exists:
             return False
         self.store.sadd(
             self._get_state_hash(),
             shape.hash()
         )
         return True
+    
+    async def clean(self):
+        
+        self.store.flushall()
